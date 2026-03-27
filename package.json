@@ -1,0 +1,21 @@
+{
+  "name": "lexchain",
+  "version": "1.0.0",
+  "description": "LexChain — Decentralized Legal Platform. Capstone Project.",
+  "scripts": {
+    "test":    "hardhat test",
+    "deploy":  "hardhat run scripts/deploy.js --network sepolia",
+    "compile": "hardhat compile",
+    "clean":   "hardhat clean",
+    "node":    "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.4.0"
+  }
+}
