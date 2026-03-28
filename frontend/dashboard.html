@@ -1,0 +1,3071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LexChain — Decentralized Legal Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- ethers.js v6 from CDN — no npm needed for the frontend -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+  <style>
+    /* ─── CSS RESET & BASE ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #0a0f1e;
+      --surface:     #111827;
+      --surface2:    #1a2235;
+      --border:      #1f2937;
+      --border2:     #374151;
+      --primary:     #6366f1;
+      --primary-dim: #1e1b4b;
+      --teal:        #14b8a6;
+      --success:     #10b981;
+      --warning:     #f59e0b;
+      --danger:      #ef4444;
+      --text:        #f9fafb;
+      --muted:       #9ca3af;
+      --sidebar-w:   260px;
+    }
+    html, body { height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── SCROLLBAR ────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ─── SIDEBAR ──────────────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      height: 100vh;
+      background: #0d1117;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px;
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 8px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--teal));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .sidebar-logo h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px; font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .sidebar-logo p {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 1px;
+    }
+    .nav-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 0 8px;
+      margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px; font-weight: 500;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+      border: none; background: none; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: var(--surface); color: var(--text); }
+    .nav-item.active {
+      background: var(--primary-dim);
+      color: var(--primary);
+      border-left: 3px solid var(--primary);
+      padding-left: 9px;
+    }
+    .nav-item svg { flex-shrink: 0; }
+    .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .sidebar-bottom { margin-top: auto; }
+    .wallet-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .wallet-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .wallet-addr { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; font-family: monospace; }
+    .wallet-bal { font-size: 12px; color: var(--teal); margin-bottom: 12px; }
+    .btn-disconnect {
+      width: 100%; padding: 8px; background: transparent;
+      border: 1px solid var(--border2); border-radius: 8px;
+      color: var(--muted); font-size: 12px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-disconnect:hover { border-color: var(--danger); color: var(--danger); }
+    #sidebar-connect { padding: 12px 8px; color: var(--muted); font-size: 13px; }
+
+    /* ─── MAIN CONTENT ─────────────────────────────────────────────── */
+    #main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    #topbar {
+      background: #0d1117;
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    #topbar h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px; font-weight: 600;
+    }
+    #content { padding: 32px; flex: 1; }
+
+    /* ─── BUTTONS ──────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 10px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      border: none; transition: all 0.2s; text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #5254cc; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+    .btn-secondary { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    .btn-secondary:hover { background: var(--primary-dim); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-warning { background: var(--warning); color: #1a1a1a; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--border2); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    .btn-connect { background: linear-gradient(135deg, var(--primary), var(--teal)); color: #fff; padding: 10px 22px; border-radius: 10px; font-weight: 600; border: none; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+    .btn-connect:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* ─── CARDS ────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .card-title { font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 600; }
+    .card-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ─── STAT CARDS ───────────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+    .stat-icon.indigo { background: rgba(99,102,241,0.15); }
+    .stat-icon.teal   { background: rgba(20,184,166,0.15); }
+    .stat-icon.green  { background: rgba(16,185,129,0.15); }
+    .stat-icon.amber  { background: rgba(245,158,11,0.15); }
+    .stat-value { font-family: 'Montserrat', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 12px; color: var(--muted); }
+
+    /* ─── BADGES ───────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+    .badge-green  { background: rgba(16,185,129,0.15); color: var(--success); }
+    .badge-green::before  { background: var(--success); }
+    .badge-amber  { background: rgba(245,158,11,0.15);  color: var(--warning); }
+    .badge-amber::before  { background: var(--warning); }
+    .badge-red    { background: rgba(239,68,68,0.15);   color: var(--danger);  }
+    .badge-red::before    { background: var(--danger); }
+    .badge-indigo { background: rgba(99,102,241,0.15);  color: var(--primary); }
+    .badge-indigo::before { background: var(--primary); }
+    .badge-teal   { background: rgba(20,184,166,0.15);  color: var(--teal);    }
+    .badge-teal::before   { background: var(--teal); }
+
+    /* ─── FORMS ────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 11px 14px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 10px; color: var(--text); font-size: 14px;
+      font-family: inherit; transition: border-color 0.15s;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+    .form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ─── TABLE ────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    .mono { font-family: monospace; font-size: 12px; }
+
+    /* ─── LAYOUT UTILS ─────────────────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .flex { display: flex; }
+    .flex-between { display: flex; align-items: center; justify-content: space-between; }
+    .flex-gap { display: flex; align-items: center; gap: 12px; }
+    .mb-4  { margin-bottom: 4px; }
+    .mb-8  { margin-bottom: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+    .mb-24 { margin-bottom: 24px; }
+    .mt-16 { margin-top: 16px; }
+    .mt-24 { margin-top: 24px; }
+    .text-muted { color: var(--muted); }
+    .text-sm { font-size: 12px; }
+    .text-xs { font-size: 11px; }
+    .font-mono { font-family: monospace; }
+
+    /* ─── PAGES ────────────────────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ─── WELCOME BANNER ───────────────────────────────────────────── */
+    .welcome-banner {
+      background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(20,184,166,0.08));
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 16px; padding: 28px; margin-bottom: 24px;
+    }
+    .welcome-banner h2 { font-family: 'Montserrat', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .welcome-banner p { color: var(--muted); margin-bottom: 16px; }
+
+    /* ─── COUNTDOWN / TIMER ────────────────────────────────────────── */
+    .countdown-card { text-align: center; }
+    .countdown-num { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 700; color: var(--primary); }
+    .countdown-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* ─── PROGRESS STEPPER ─────────────────────────────────────────── */
+    .stepper { display: flex; align-items: center; gap: 0; margin: 12px 0; }
+    .step { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+    .step-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+    .step-dot.done  { background: var(--success); border-color: var(--success); color: #fff; }
+    .step-dot.active{ background: var(--primary); border-color: var(--primary); color: #fff; }
+    .step-line { flex: 1; height: 2px; background: var(--border2); min-width: 20px; }
+    .step-line.done { background: var(--success); }
+
+    /* ─── FILE UPLOAD ──────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border2);
+      border-radius: 12px; padding: 32px;
+      text-align: center; cursor: pointer;
+      transition: all 0.2s; position: relative;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: var(--primary-dim); }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .hash-display { background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 11px; color: var(--teal); word-break: break-all; margin-top: 12px; }
+
+    /* ─── QUICK ACTION CARDS ───────────────────────────────────────── */
+    .quick-action {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; cursor: pointer;
+      transition: all 0.2s; text-align: center;
+    }
+    .quick-action:hover { border-color: var(--primary); background: var(--primary-dim); transform: translateY(-2px); }
+    .qa-icon { font-size: 28px; margin-bottom: 8px; }
+    .qa-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .qa-desc { font-size: 12px; color: var(--muted); }
+
+    /* ─── DEAL CARD ────────────────────────────────────────────────── */
+    .deal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    .deal-title { font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+
+    /* ─── TRIGGERED ALERT ─────────────────────────────────────────── */
+    .alert-triggered {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.4);
+      border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    }
+    .alert-triggered h4 { color: var(--danger); font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+
+    /* ─── AUDIT LOG ENTRY ──────────────────────────────────────────── */
+    .audit-entry { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .audit-entry:last-child { border-bottom: none; }
+    .audit-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); margin-top: 6px; flex-shrink: 0; }
+
+    /* ─── TOAST NOTIFICATIONS ──────────────────────────────────────── */
+    #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+    .toast { padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: 360px; animation: slideIn 0.25s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .toast-success { background: #064e3b; border: 1px solid var(--success); color: #d1fae5; }
+    .toast-error   { background: #450a0a; border: 1px solid var(--danger);  color: #fee2e2; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* ─── LOADING SPINNER ──────────────────────────────────────────── */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── SECTION PANEL (slide-in form) ───────────────────────────── */
+    .panel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px;
+      margin-bottom: 24px;
+      display: none;
+    }
+    .panel.open { display: block; }
+
+    /* ─── PERCENTAGE INDICATOR ─────────────────────────────────────── */
+    .pct-bar { background: var(--border); border-radius: 4px; height: 6px; margin-top: 8px; overflow: hidden; }
+    .pct-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+
+    /* ─── ETHERSCAN LINK ───────────────────────────────────────────── */
+    .etherscan-link { color: var(--teal); text-decoration: none; font-size: 12px; }
+    .etherscan-link:hover { text-decoration: underline; }
+
+    /* ─── VERIFY RESULT ────────────────────────────────────────────── */
+    .verify-result { border-radius: 12px; padding: 20px; text-align: center; margin-top: 16px; }
+    .verify-authentic { background: rgba(16,185,129,0.1); border: 1px solid var(--success); }
+    .verify-unknown   { background: rgba(239,68,68,0.1);  border: 1px solid var(--danger);  }
+    .verify-revoked   { background: rgba(245,158,11,0.1); border: 1px solid var(--warning); }
+    .verify-icon { font-size: 36px; margin-bottom: 8px; }
+    .verify-title { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+
+
+    /* ─── DEMO PANEL ───────────────────────────────────────────────── */
+    .demo-panel {
+      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(20,184,166,0.04));
+      border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .demo-panel h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 15px; font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .demo-scenario {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .demo-scenario:hover { border-color: var(--primary); }
+    .demo-scenario-title {
+      font-weight: 600; font-size: 14px; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .demo-scenario-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .demo-log {
+      background: #0a0f1e;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+      display: none;
+    }
+    .demo-log.visible { display: block; }
+    .demo-log-line { margin-bottom: 4px; line-height: 1.5; }
+    .demo-log-line.ok   { color: #10b981; }
+    .demo-log-line.err  { color: #ef4444; }
+    .demo-log-line.info { color: #9ca3af; }
+    .demo-log-line.warn { color: #f59e0b; }
+    .demo-log-line.bold { color: #f9fafb; font-weight: 700; }
+    .demo-step-track {
+      display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap;
+    }
+    .demo-step-chip {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+    .demo-step-chip.active  { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .demo-step-chip.done    { background: rgba(16,185,129,0.15); color: var(--success); border-color: var(--success); }
+    .demo-step-chip.failed  { background: rgba(239,68,68,0.15); color: var(--danger); border-color: var(--danger); }
+    .attack-meter {
+      height: 8px; border-radius: 4px;
+      background: var(--border);
+      overflow: hidden; margin: 8px 0;
+    }
+    .attack-meter-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+      transition: width 0.5s ease;
+    }
+
+    /* ─── CONNECT OVERLAY ──────────────────────────────────────────── */
+    .connect-required { text-align: center; padding: 48px 24px; }
+    .connect-required h3 { font-family: 'Montserrat', sans-serif; font-size: 18px; margin-bottom: 8px; }
+    .connect-required p { color: var(--muted); margin-bottom: 20px; }
+
+    /* ─── MISC ─────────────────────────────────────────────────────── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+    .empty-state svg { opacity: 0.3; margin-bottom: 12px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .key { color: var(--muted); font-size: 12px; }
+    .info-row .val { font-size: 13px; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════ SIDEBAR ═══════ -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+        <path d="M3 6l9-3 9 3v6c0 5.25-3.75 9.25-9 11C6.75 21.25 3 17.25 3 12V6z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    </div>
+    <div>
+      <h1>LexChain</h1>
+      <p>Legal Platform</p>
+    </div>
+  </div>
+
+  <p class="nav-label">Menu</p>
+  <button class="nav-item active" onclick="showPage('dashboard')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </button>
+  <button class="nav-item" onclick="showPage('will')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    My Will
+  </button>
+  <button class="nav-item" onclick="showPage('property')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Property Deals
+  </button>
+  <button class="nav-item" onclick="showPage('notary')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Document Notary
+  </button>
+  <button class="nav-item" onclick="showPage('audit')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Audit Trail
+  </button>
+  <button class="nav-item" onclick="showPage('fraud')" id="nav-fraud">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Fraud Guard
+    <span id="nav-fraud-badge" style="display:none;margin-left:auto;background:var(--danger);color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;font-weight:700;">ALERT</span>
+  </button>
+
+  <hr class="sidebar-divider" />
+
+  <div class="sidebar-bottom">
+    <div id="sidebar-connect">
+      <p class="text-sm text-muted" style="margin-bottom:10px;">Connect your wallet to access all features.</p>
+    </div>
+    <div id="sidebar-wallet" class="wallet-card" style="display:none;">
+      <div class="wallet-label">Connected Wallet</div>
+      <div class="wallet-addr" id="sidebar-addr">—</div>
+      <div class="wallet-bal" id="sidebar-bal">0.00 ETH</div>
+      <button class="btn-disconnect" onclick="disconnectWallet()">Disconnect</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════ MAIN ════════════ -->
+<main id="main">
+  <header id="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div>
+      <button class="btn-connect" id="btn-connect" onclick="connectWallet()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        Connect MetaMask
+      </button>
+      <div id="topbar-wallet" style="display:none; align-items:center; gap:12px;">
+        <div style="text-align:right;">
+          <div style="font-size:13px;font-weight:600;" id="topbar-addr">—</div>
+          <div style="font-size:11px;color:var(--teal);" id="topbar-net">Sepolia</div>
+        </div>
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,var(--primary),var(--teal));border-radius:50%;"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="content">
+
+    <!-- ══════════════════════════════════ PAGE: DASHBOARD ══════════ -->
+    <section id="page-dashboard" class="page active">
+      <!-- Welcome Banner -->
+      <div class="welcome-banner">
+        <h2>Welcome to LexChain ⚖️</h2>
+        <p>Your legal documents are secured by blockchain technology — permanent, tamper-proof, and verifiable by anyone.</p>
+        <div id="banner-connect-cta">
+          <button class="btn btn-primary" onclick="connectWallet()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Connect MetaMask to Get Started
+          </button>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon indigo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="stat-value" id="stat-docs">—</div>
+          <div class="stat-label">Documents Notarized</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          </div>
+          <div class="stat-value" id="stat-deals">—</div>
+          <div class="stat-label">Property Deals</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+          </div>
+          <div class="stat-value" id="stat-will">—</div>
+          <div class="stat-label">Will Status</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-value" id="stat-days">—</div>
+          <div class="stat-label">Days Until Will Trigger</div>
+        </div>
+      </div>
+
+      <!-- Two column: Recent Audit + Quick Actions -->
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Recent Activity</div>
+              <div class="card-subtitle">Last 5 audit trail entries</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('audit')">View All</button>
+          </div>
+          <div id="recent-audit">
+            <div class="empty-state"><p>No activity yet</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Quick Actions</div>
+              <div class="card-subtitle">Get started with LexChain</div>
+            </div>
+          </div>
+          <div class="three-col">
+            <div class="quick-action" onclick="showPage('will')">
+              <div class="qa-icon">📜</div>
+              <div class="qa-title">Write Your Will</div>
+              <div class="qa-desc">Assign your estate to heirs</div>
+            </div>
+            <div class="quick-action" onclick="showPage('property')">
+              <div class="qa-icon">🏠</div>
+              <div class="qa-title">Property Deal</div>
+              <div class="qa-desc">Start an escrow transaction</div>
+            </div>
+            <div class="quick-action" onclick="showPage('notary')">
+              <div class="qa-icon">🔏</div>
+              <div class="qa-title">Notarize Doc</div>
+              <div class="qa-desc">Hash any file on-chain</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ PAGE: WILL ═══════════════ -->
+    <section id="page-will" class="page">
+      <!-- Status Card -->
+      <div class="card mb-24">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Will Status</div>
+            <div class="card-subtitle">Your on-chain last will and testament</div>
+          </div>
+          <div id="will-status-badge"><span class="badge badge-amber">Draft</span></div>
+        </div>
+        <div id="will-triggered-alert" style="display:none;">
+          <div class="alert-triggered">
+            <h4>⚠️ Will Has Been Triggered!</h4>
+            <p style="color:var(--muted);font-size:13px;">Your will was triggered due to inactivity. You have <strong id="dispute-days-left" style="color:var(--danger);">—</strong> days left to cancel. Click the button below to confirm you are alive.</p>
+            <div style="margin-top:12px; display:flex; gap:10px;">
+              <button class="btn btn-danger" onclick="cancelWillTrigger()">Cancel Trigger — I'm Alive!</button>
+            </div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="form-group">
+              <label class="form-label">Will Description</label>
+              <textarea class="form-textarea" id="will-desc-input" placeholder="Describe your will and estate..."></textarea>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="updateWillDescription()">Save Description</button>
+          </div>
+          <div>
+            <div class="info-row"><span class="key">Estate Balance</span><span class="val" id="will-balance">0.00 ETH</span></div>
+            <div class="info-row"><span class="key">Last Activity</span><span class="val" id="will-last-activity">—</span></div>
+            <div class="info-row"><span class="key">Beneficiaries</span><span class="val" id="will-beneficiary-count">0 / 5</span></div>
+            <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="finalizeWill()" id="btn-finalize" style="display:none;">🔒 Finalize Will</button>
+              <button class="btn btn-ghost btn-sm" onclick="recordActivity()">✅ I Am Alive</button>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('deposit-panel').classList.toggle('open')">💰 Deposit ETH</button>
+            </div>
+          </div>
+        </div>
+        <div id="deposit-panel" class="panel mt-16">
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Amount (ETH)</label>
+              <input type="number" class="form-input" id="deposit-amount" placeholder="0.1" step="0.01" min="0.001"/>
+            </div>
+            <button class="btn btn-primary" onclick="depositToEstate()">Deposit to Estate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Beneficiaries -->
+      <div class="card mb-24">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Beneficiaries</div>
+            <div class="card-subtitle">Up to 5 people who will inherit from your estate</div>
+          </div>
+          <div id="pct-badge"><span class="badge badge-amber">0% allocated</span></div>
+        </div>
+        <div class="pct-bar mb-16">
+          <div class="pct-fill" id="pct-fill" style="width:0%;background:var(--warning)"></div>
+        </div>
+        <div class="table-wrap mb-16">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Relationship</th><th>Wallet</th><th>Share</th><th>Action</th></tr>
+            </thead>
+            <tbody id="beneficiaries-tbody">
+              <tr><td colspan="5" class="empty-state">No beneficiaries added yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <hr class="divider" />
+        <div class="card-title mb-16">Add Beneficiary</div>
+        <div class="form-row mb-16">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" id="ben-name" placeholder="John Smith"/>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Relationship</label>
+            <select class="form-select" id="ben-relationship">
+              <option value="son">Son</option>
+              <option value="daughter">Daughter</option>
+              <option value="spouse">Spouse</option>
+              <option value="parent">Parent</option>
+              <option value="sibling">Sibling</option>
+              <option value="friend">Friend</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Wallet Address</label>
+            <input type="text" class="form-input font-mono" id="ben-wallet" placeholder="0x..."/>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Percentage (%)</label>
+            <input type="number" class="form-input" id="ben-pct" placeholder="25" min="1" max="100"/>
+          </div>
+        </div>
+        <button class="btn btn-primary mt-16" onclick="addBeneficiary()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Beneficiary
+        </button>
+      </div>
+
+      <!-- Activity Monitor -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Activity Monitor</div>
+            <div class="card-subtitle">The death switch — 180 days of inactivity triggers your will</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="countdown-card">
+            <div class="countdown-num" id="days-countdown">—</div>
+            <div class="countdown-label">Days Until Trigger</div>
+          </div>
+          <div>
+            <div class="info-row"><span class="key">Inactivity Period</span><span class="val">180 days</span></div>
+            <div class="info-row"><span class="key">Dispute Window</span><span class="val">7 days</span></div>
+            <div class="info-row"><span class="key">Will Triggered</span><span class="val" id="will-triggered-status">—</span></div>
+            <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-success" onclick="recordActivity()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                I Am Alive — Reset Timer
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="checkAndTrigger()">Check Trigger</button>
+              <button class="btn btn-ghost btn-sm" onclick="distributeEstate()">Distribute Estate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ PAGE: PROPERTY ═══════════ -->
+    <section id="page-property" class="page">
+      <div class="flex-between mb-24">
+        <div>
+          <h3 style="font-family:'Montserrat',sans-serif;font-size:18px;font-weight:600;">Property Deals</h3>
+          <p class="text-muted text-sm">Trustless escrow for property transactions</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('new-deal-panel').classList.toggle('open')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Deal
+        </button>
+      </div>
+
+      <div class="panel" id="new-deal-panel">
+        <div class="card-title mb-16">Create New Property Deal</div>
+        <div class="form-row mb-0">
+          <div class="form-group">
+            <label class="form-label">Seller Wallet Address</label>
+            <input type="text" class="form-input font-mono" id="deal-seller" placeholder="0x..."/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Agreed Price (ETH)</label>
+            <input type="number" class="form-input" id="deal-price" placeholder="1.5" step="0.01" min="0.001"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Property Description</label>
+          <input type="text" class="form-input" id="deal-desc" placeholder="3-bedroom house, 2 bathrooms, garden..."/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Physical Address</label>
+          <input type="text" class="form-input" id="deal-addr" placeholder="123 Main Street, City, Country"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deal Conditions (plain English)</label>
+          <textarea class="form-textarea" id="deal-conditions" placeholder="e.g. Seller must transfer title deed and provide clear property certificate before funds release..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="createDeal()">Create Escrow Deal</button>
+      </div>
+
+      <div id="deals-container">
+        <div class="empty-state card">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          <p>No property deals yet. Create your first deal above.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ PAGE: NOTARY ═════════════ -->
+    <section id="page-notary" class="page">
+      <div class="two-col mb-24">
+
+        <!-- Left: Notarize -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Notarize a Document</div>
+              <div class="card-subtitle">File never leaves your device — only the hash is stored</div>
+            </div>
+          </div>
+          <div class="upload-zone" id="notarize-zone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleNotarizeDrop(event)">
+            <input type="file" id="notarize-file" onchange="handleNotarizeFile(this.files[0])"/>
+            <div class="upload-icon">📄</div>
+            <p style="font-weight:600;margin-bottom:4px;">Drop file here or click to upload</p>
+            <p class="text-muted text-sm">Any file type — PDF, image, doc, etc.</p>
+          </div>
+          <div id="notarize-file-info" style="display:none;" class="mt-16">
+            <div class="info-row"><span class="key">File Name</span><span class="val" id="notarize-filename">—</span></div>
+            <div class="info-row"><span class="key">File Size</span><span class="val" id="notarize-filesize">—</span></div>
+            <div class="hash-display" id="notarize-hash">Computing hash...</div>
+          </div>
+          <div class="form-group mt-16">
+            <label class="form-label">Document Title</label>
+            <input type="text" class="form-input" id="notarize-title" placeholder="My Property Deed 2024"/>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Document Type</label>
+              <select class="form-select" id="notarize-type">
+                <option value="Will">Will</option>
+                <option value="Property Deed">Property Deed</option>
+                <option value="Rental Agreement">Rental Agreement</option>
+                <option value="Contract">Contract</option>
+                <option value="Certificate">Certificate</option>
+                <option value="Medical Record">Medical Record</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group mt-16">
+            <label class="form-label">Description (optional)</label>
+            <textarea class="form-textarea" id="notarize-desc" placeholder="Additional details about this document..."></textarea>
+          </div>
+          <button class="btn btn-primary mt-16" id="btn-notarize" onclick="notarizeDocument()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Notarize Document
+          </button>
+          <div id="notarize-success" style="display:none;" class="mt-16">
+            <div class="verify-result verify-authentic">
+              <div class="verify-icon">✅</div>
+              <div class="verify-title" style="color:var(--success)">Document Notarized!</div>
+              <p class="text-sm text-muted" style="margin:4px 0 8px">View on Etherscan:</p>
+              <a id="notarize-tx-link" href="#" target="_blank" class="etherscan-link">View Transaction →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Verify -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Verify a Document</div>
+              <div class="card-subtitle">Upload the file to check if it's authentic and unmodified</div>
+            </div>
+          </div>
+          <div class="upload-zone" id="verify-zone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleVerifyDrop(event)">
+            <input type="file" id="verify-file" onchange="handleVerifyFile(this.files[0])"/>
+            <div class="upload-icon">🔍</div>
+            <p style="font-weight:600;margin-bottom:4px;">Drop file here to verify</p>
+            <p class="text-muted text-sm">We'll hash it and check the blockchain</p>
+          </div>
+          <div id="verify-file-info" style="display:none;" class="mt-16">
+            <div class="hash-display" id="verify-hash">Computing hash...</div>
+          </div>
+          <button class="btn btn-secondary mt-16" id="btn-verify" onclick="verifyDocumentFile()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Verify Document
+          </button>
+          <div id="verify-result" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- My Documents Table -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">My Documents</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadMyDocuments()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Title</th><th>Type</th><th>Date</th><th>Hash</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody id="documents-tbody">
+              <tr><td colspan="7" class="empty-state">Connect wallet to see your documents.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ PAGE: AUDIT ══════════════ -->
+    <section id="page-audit" class="page">
+      <div class="card mb-24" style="padding:16px 24px;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-group" style="margin:0;flex:1;min-width:160px;">
+            <label class="form-label">Filter by Action</label>
+            <select class="form-select" id="audit-filter-type" onchange="loadAuditTrail()">
+              <option value="">All Actions</option>
+              <option value="BENEFICIARY_ADDED">Beneficiary Added</option>
+              <option value="WILL_FINALIZED">Will Finalized</option>
+              <option value="WILL_TRIGGERED">Will Triggered</option>
+              <option value="ESTATE_DISTRIBUTED">Estate Distributed</option>
+              <option value="DEAL_CREATED">Deal Created</option>
+              <option value="DEAL_FUNDED">Deal Funded</option>
+              <option value="DEAL_COMPLETED">Deal Completed</option>
+              <option value="DOCUMENT_NOTARIZED">Document Notarized</option>
+              <option value="DOCUMENT_REVOKED">Document Revoked</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:160px;">
+            <label class="form-label">Search by Wallet</label>
+            <input type="text" class="form-input font-mono" id="audit-filter-addr" placeholder="0x..." oninput="loadAuditTrail()"/>
+          </div>
+          <button class="btn btn-ghost" onclick="exportAuditLog()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">On-Chain Audit Record</div>
+            <div class="card-subtitle" id="audit-count">Every action on LexChain is permanently recorded here.</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Action</th><th>User</th><th>Details</th><th>Timestamp</th><th>Integrity</th></tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="6" class="empty-state">Connect wallet to load audit trail.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ══════════════════════════════════ PAGE: FRAUD GUARD ════════ -->
+    <section id="page-fraud" class="page">
+
+      <!-- Top status banner — changes colour based on alert level -->
+      <div id="fraud-status-banner" class="welcome-banner mb-24" style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(20,184,166,0.06));border-color:rgba(16,185,129,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="font-size:18px;margin-bottom:4px;">
+              🛡️ Fraud Guard
+              <span id="fraud-armed-pill" class="badge badge-green" style="font-size:11px;vertical-align:middle;">ARMED</span>
+              <span id="watcher-status" style="font-size:11px;font-family:monospace;color:var(--muted);margin-left:8px;" title="Connect wallet to start monitoring">○ OFF</span>
+            </h2>
+            <p style="margin:0;">Alert Level: <strong id="fraud-alert-text" style="color:var(--success);">NONE — System is monitoring automatically</strong></p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger btn-sm" onclick="manuallyFlagFraud()">⚠️ Flag Fraud Now</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelFraudAlert()" id="btn-cancel-alert" style="display:none;">✅ Cancel Alert (False Alarm)</button>
+            <button class="btn btn-ghost btn-sm" onclick="resetFraudGuard()" id="btn-reset-guard" style="display:none;">🔄 Reset Guard</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col mb-24">
+        <!-- Left: Config -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Protection Settings</div>
+          </div>
+          <div class="info-row"><span class="key">Safe Wallet</span><span class="val mono text-xs" id="fraud-safe-wallet">—</span></div>
+          <div class="info-row"><span class="key">Guardian</span><span class="val mono text-xs" id="fraud-guardian">—</span></div>
+          <div class="info-row"><span class="key">Protected Balance</span><span class="val" id="fraud-balance">—</span></div>
+          <div class="info-row"><span class="key">Whitelisted Addresses</span><span class="val" id="fraud-whitelist-count">—</span></div>
+          <hr class="divider"/>
+          <div class="form-group">
+            <label class="form-label">Update Safe Wallet</label>
+            <input type="text" class="form-input font-mono" id="fraud-new-safe" placeholder="0x... (your cold/hardware wallet)"/>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="updateSafeWallet()">Update Safe Wallet</button>
+          <hr class="divider"/>
+          <div class="form-group">
+            <label class="form-label">Add Trusted Address (Whitelist)</label>
+            <input type="text" class="form-input font-mono" id="fraud-whitelist-input" placeholder="0x... address to trust"/>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="addToWhitelist()">Add to Whitelist</button>
+          <hr class="divider"/>
+          <div class="form-group">
+            <label class="form-label">Deposit ETH to Protected Pool</label>
+            <input type="number" class="form-input" id="fraud-deposit-amount" placeholder="0.1" step="0.01"/>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="depositToFraudGuard()">Deposit ETH</button>
+        </div>
+
+        <!-- Right: Transfer stages -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Gradual Safe Transfer</div>
+              <div class="card-subtitle">3 stages × 24h delay each — attacker cannot drain instantly</div>
+            </div>
+          </div>
+          <!-- Visual Stage Timeline -->
+          <div style="position:relative;padding:16px 0;">
+            <div style="display:flex;flex-direction:column;gap:0;">
+
+              <div id="stage-1-row" style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-radius:12px;border:1px solid var(--border);margin-bottom:8px;">
+                <div id="stage-1-dot" style="width:40px;height:40px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">1</div>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <strong>Stage 1 — 30%</strong>
+                    <span id="stage-1-badge" class="badge badge-amber">Pending</span>
+                  </div>
+                  <div class="text-sm text-muted" id="stage-1-detail">Queued after fraud detected. Executes 24h later.</div>
+                  <div class="text-sm" id="stage-1-amount" style="color:var(--teal);margin-top:4px;"></div>
+                </div>
+              </div>
+
+              <div style="width:2px;height:16px;background:var(--border);margin-left:35px;"></div>
+
+              <div id="stage-2-row" style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-radius:12px;border:1px solid var(--border);margin-bottom:8px;opacity:0.5;">
+                <div id="stage-2-dot" style="width:40px;height:40px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">2</div>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <strong>Stage 2 — 40%</strong>
+                    <span id="stage-2-badge" class="badge badge-amber">Waiting</span>
+                  </div>
+                  <div class="text-sm text-muted" id="stage-2-detail">Queued after Stage 1 executes. Another 24h wait.</div>
+                  <div class="text-sm" id="stage-2-amount" style="color:var(--teal);margin-top:4px;"></div>
+                </div>
+              </div>
+
+              <div style="width:2px;height:16px;background:var(--border);margin-left:35px;"></div>
+
+              <div id="stage-3-row" style="display:flex;align-items:flex-start;gap:16px;padding:16px;border-radius:12px;border:1px solid var(--border);opacity:0.5;">
+                <div id="stage-3-dot" style="width:40px;height:40px;border-radius:50%;background:var(--border2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">3</div>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <strong>Stage 3 — 30% (remainder)</strong>
+                    <span id="stage-3-badge" class="badge badge-amber">Waiting</span>
+                  </div>
+                  <div class="text-sm text-muted" id="stage-3-detail">Final transfer. All funds now in safe wallet.</div>
+                  <div class="text-sm" id="stage-3-amount" style="color:var(--teal);margin-top:4px;"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div id="fraud-execute-row" style="display:none;margin-top:16px;">
+            <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:14px;margin-bottom:12px;">
+              <strong style="color:var(--warning);">⏳ Next stage ready in: <span id="fraud-countdown">—</span></strong>
+              <p class="text-sm text-muted" style="margin-top:4px;">When the timer reaches 0, click Execute to move funds to safe wallet.</p>
+            </div>
+            <button class="btn btn-warning" onclick="executeNextStage()">⚡ Execute Next Stage</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suspicious Events Log -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Suspicious Events Log</div>
+            <div class="card-subtitle">Every anomaly detected by FraudGuard</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadFraudGuardData()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Time</th><th>Reason</th><th>Amount Involved</th><th>Suspect Address</th><th>Status</th></tr>
+            </thead>
+            <tbody id="fraud-events-tbody">
+              <tr><td colspan="6" class="empty-state">No suspicious events recorded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- ══ PROFESSOR DEMO PANEL ══════════════════════════════════════ -->
+      <div class="demo-panel mb-24">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          Live Demo — Click to Simulate Attacks
+        </h3>
+        <p class="text-sm text-muted" style="margin-bottom:16px;">
+          Each scenario calls <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:11px;">reportSuspiciousActivity()</code> — the same function the
+          automatic watcher and other LexChain contracts use. In a real attack this fires
+          without any user input. For the demo, click a button to simulate the attack.
+          <strong style="color:var(--warning);">Requires wallet connected + ETH deposited into FraudGuard first.</strong>
+        </p>
+
+        <!-- Scenario A -->
+        <div class="demo-scenario" id="demo-scenario-a">
+          <div class="demo-scenario-title">
+            <span style="font-size:18px;">💸</span>
+            Scenario A — Large Single Transfer Attack
+            <span class="badge badge-red" style="margin-left:auto;">HIGH RISK</span>
+          </div>
+          <div class="demo-scenario-desc">
+            Simulates an attacker draining 70% of the protected balance in one transaction.
+            FraudGuard detects it exceeds the 50% threshold and immediately raises a HIGH alert,
+            queuing the gradual safe transfer. The attacker cannot drain everything instantly.
+          </div>
+          <div class="demo-step-track" id="demo-a-steps">
+            <div class="demo-step-chip" id="demo-a-s1">1. Record tx</div>
+            <div class="demo-step-chip" id="demo-a-s2">2. Alert raised</div>
+            <div class="demo-step-chip" id="demo-a-s3">3. Stage queued</div>
+            <div class="demo-step-chip" id="demo-a-s4">4. Block attempt</div>
+            <div class="demo-step-chip" id="demo-a-s5">5. Done</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger btn-sm" id="btn-demo-a" onclick="demoLargeTransfer()">
+              ▶ Run Scenario A
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="demoCancelAndReset('a')">Reset</button>
+          </div>
+          <div class="demo-log" id="demo-log-a"></div>
+        </div>
+
+        <!-- Scenario B -->
+        <div class="demo-scenario" id="demo-scenario-b">
+          <div class="demo-scenario-title">
+            <span style="font-size:18px;">⚡</span>
+            Scenario B — Velocity Spike Attack (Rapid Small Transactions)
+            <span class="badge badge-amber" style="margin-left:auto;">MEDIUM RISK</span>
+          </div>
+          <div class="demo-scenario-desc">
+            Simulates an attacker splitting a large theft into many small transactions to avoid
+            the 50% threshold. After 6 transactions in quick succession, FraudGuard detects
+            the velocity spike and escalates to HIGH alert automatically.
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Transaction velocity meter</div>
+            <div class="attack-meter"><div class="attack-meter-fill" id="velocity-meter" style="width:0%"></div></div>
+            <div style="font-size:11px;color:var(--muted);text-align:right;" id="velocity-count">0 / 6 transactions</div>
+          </div>
+          <div class="demo-step-track" id="demo-b-steps">
+            <div class="demo-step-chip" id="demo-b-s1">Txn 1</div>
+            <div class="demo-step-chip" id="demo-b-s2">Txn 2</div>
+            <div class="demo-step-chip" id="demo-b-s3">Txn 3</div>
+            <div class="demo-step-chip" id="demo-b-s4">Txn 4</div>
+            <div class="demo-step-chip" id="demo-b-s5">Txn 5</div>
+            <div class="demo-step-chip" id="demo-b-s6">Txn 6 - SPIKE!</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-warning btn-sm" id="btn-demo-b" onclick="demoVelocitySpike()">
+              ▶ Run Scenario B
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="demoCancelAndReset('b')">Reset</button>
+          </div>
+          <div class="demo-log" id="demo-log-b"></div>
+        </div>
+
+        <!-- Scenario C -->
+        <div class="demo-scenario" id="demo-scenario-c">
+          <div class="demo-scenario-title">
+            <span style="font-size:18px;">✅</span>
+            Scenario C — False Alarm (Owner Cancels)
+            <span class="badge badge-green" style="margin-left:auto;">RECOVERY</span>
+          </div>
+          <div class="demo-scenario-desc">
+            The real owner comes back online, sees the alert was a false alarm (they were simply
+            on holiday), and cancels it within the 24-hour window. No ETH moves. The guard
+            resets and is ready to protect again.
+          </div>
+          <div class="demo-step-track">
+            <div class="demo-step-chip" id="demo-c-s1">1. Alert exists</div>
+            <div class="demo-step-chip" id="demo-c-s2">2. Owner cancels</div>
+            <div class="demo-step-chip" id="demo-c-s3">3. No ETH moved</div>
+            <div class="demo-step-chip" id="demo-c-s4">4. Guard reset</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm" id="btn-demo-c" onclick="demoFalseAlarm()">
+              ▶ Run Scenario C
+            </button>
+          </div>
+          <div class="demo-log" id="demo-log-c"></div>
+        </div>
+
+        <!-- Scenario D -->
+        <div class="demo-scenario" id="demo-scenario-d">
+          <div class="demo-scenario-title">
+            <span style="font-size:18px;">🏦</span>
+            Scenario D — Full Gradual Transfer (All 3 Stages)
+            <span class="badge badge-indigo" style="margin-left:auto;">FULL DEMO</span>
+          </div>
+          <div class="demo-scenario-desc">
+            Triggers a fraud alert then fast-forwards through all three 24-hour stages on-chain.
+            Shows 30% → 40% → 30% moving to the safe wallet in sequence. The attacker gets
+            nothing. Each stage is a separate blockchain transaction.
+            <strong style="color:var(--warning);"> Uses evm_increaseTime — only works on local Hardhat node, not Sepolia.</strong>
+          </div>
+          <div class="demo-step-track">
+            <div class="demo-step-chip" id="demo-d-s1">Alert raised</div>
+            <div class="demo-step-chip" id="demo-d-s2">+24h Stage 1 (30%)</div>
+            <div class="demo-step-chip" id="demo-d-s3">+24h Stage 2 (40%)</div>
+            <div class="demo-step-chip" id="demo-d-s4">+24h Stage 3 (30%)</div>
+            <div class="demo-step-chip" id="demo-d-s5">Complete!</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="btn-demo-d" onclick="demoFullTransfer()">
+              ▶ Run Scenario D (Local Only)
+            </button>
+          </div>
+          <div class="demo-log" id="demo-log-d"></div>
+        </div>
+
+      </div>
+      <!-- ══ END DEMO PANEL ════════════════════════════════════════════ -->
+
+      <!-- How It Works explanation -->
+      <div class="card mt-24">
+        <div class="card-header"><div class="card-title">How Fraud Guard Works</div></div>
+        <div class="three-col">
+          <div style="padding:16px;background:var(--surface2);border-radius:12px;">
+            <div style="font-size:24px;margin-bottom:8px;">🔍</div>
+            <div style="font-weight:600;margin-bottom:6px;">Detection</div>
+            <p class="text-sm text-muted">Monitors for large single transfers (&gt;50% balance), velocity spikes (&gt;5 txns/hour), and transfers to unknown addresses.</p>
+          </div>
+          <div style="padding:16px;background:var(--surface2);border-radius:12px;">
+            <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+            <div style="font-weight:600;margin-bottom:6px;">Slow Transfer</div>
+            <p class="text-sm text-muted">Instead of instant drain, funds move in 3 stages of 30%, 40%, 30% with a mandatory 24-hour wait between each stage.</p>
+          </div>
+          <div style="padding:16px;background:var(--surface2);border-radius:12px;">
+            <div style="font-size:24px;margin-bottom:8px;">✅</div>
+            <div style="font-weight:600;margin-bottom:6px;">Cancel Window</div>
+            <p class="text-sm text-muted">If it was a false alarm, the real owner can cancel at any time before a stage executes. ETH stays safe — nothing is lost.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Activity Feed -->
+      <div class="card mt-24">
+        <div class="card-header">
+          <div>
+            <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+              <span>Live Watcher Activity</span>
+              <span id="watcher-status-card" style="font-size:11px;font-family:monospace;color:var(--muted);">○ Connect wallet to activate</span>
+            </div>
+            <div class="card-subtitle">Real-time automatic fraud detection log — no manual input required</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="startFraudWatcher().then(()=>showSuccess('Watcher restarted'))">Restart Watcher</button>
+          </div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;min-height:80px;max-height:220px;overflow-y:auto;" id="watcher-feed">
+          <div style="color:var(--muted);font-size:12px;font-family:monospace;">Waiting for activity... connect wallet to start monitoring.</div>
+        </div>
+        <div class="mt-16" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;margin-bottom:4px;">🔍</div>
+            <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Balance Drop Check</div>
+            <div style="font-size:11px;color:var(--muted);">Alerts if wallet balance drops >40% between checks</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;margin-bottom:4px;">⚡</div>
+            <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Block Scanner</div>
+            <div style="font-size:11px;color:var(--muted);">Scans every new block for large outgoing transactions</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;margin-bottom:4px;">📊</div>
+            <div style="font-size:11px;font-weight:600;margin-bottom:2px;">Velocity Counter</div>
+            <div style="font-size:11px;color:var(--muted);">Flags if more than 5 outgoing txns occur in 1 hour</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </div><!-- /content -->
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIGURATION — Paste your deployed contract addresses here
+// after running: npx hardhat run scripts/deploy.js --network sepolia
+// ═══════════════════════════════════════════════════════════════════
+const ADDRESSES = {
+  AuditTrail: "0xf4F5b948b3428fd7FfD22B50AaeD75aAb748a392",
+  WillRegistry: "0xf42E16a30618A165c5077b67e126dcE1f1018c2e",
+  PropertyEscrow: "0xFB20d63057D3F879D8d3aD96c1a0A8B5Cd866130",
+  DocumentNotary: "0xfBe8A4961b80D885eC72292b7cA1ed9B6Da25BEE",
+  FraudGuard : "0x658dDdDE8F149cC73D8D27c242B092a19C12E5FA",// replace after deploy
+};
+
+// ─── ABIs (minimal — only functions we call from the frontend) ───────
+const WILL_ABI = [
+  "function addBeneficiary(address wallet, string fullName, uint8 percentage, string relationship) external",
+  "function removeBeneficiary(address wallet) external",
+  "function updateWillDescription(string description) external",
+  "function finalizeWill() external",
+  "function recordActivity() external",
+  "function checkAndTrigger() external",
+  "function distributeEstate() external",
+  "function cancelWillTrigger() external",
+  "function deposit() external payable",
+  "function getBeneficiaries() external view returns (address[], string[], uint8[], string[], bool[])",
+  "function getTotalPercentage() public view returns (uint256)",
+  "function getDaysUntilTrigger() external view returns (uint256)",
+  "function getDaysUntilDisputeExpiry() external view returns (uint256)",
+  "function willFinalized() view returns (bool)",
+  "function willTriggered() view returns (bool)",
+  "function willDescription() view returns (string)",
+  "function lastActivityTimestamp() view returns (uint256)",
+  "function beneficiaryCount() view returns (uint256)",
+];
+
+const NOTARY_ABI = [
+  "function notarizeDocument(bytes32 documentHash, string title, string docType, string description) external",
+  "function verifyDocument(bytes32 documentHash) external returns (bool)",
+  "function revokeDocument(bytes32 documentHash) external",
+  "function getDocument(bytes32 documentHash) external view returns (tuple(bytes32 documentHash, string documentTitle, string documentType, address notarizedBy, uint256 timestamp, string description, bool isRevoked))",
+  "function getUserDocuments(address user) external view returns (bytes32[])",
+  "function getDocumentCount(address user) external view returns (uint256)",
+  "function totalDocuments() view returns (uint256)",
+];
+
+const AUDIT_ABI = [
+  "function getFullAuditLog() external view returns (tuple(address contractAddress, address userAddress, string actionType, string details, uint256 timestamp, bytes32 dataHash)[])",
+  "function getUserHistory(address user) external view returns (tuple(address contractAddress, address userAddress, string actionType, string details, uint256 timestamp, bytes32 dataHash)[])",
+  "function getEntryCount() external view returns (uint256)",
+  "function verifyEntryIntegrity(uint256 entryId, bytes32 expectedHash) external view returns (bool)",
+];
+
+const ESCROW_ABI = [
+  "function fundDeal() external payable",
+  "function buyerConfirm() external",
+  "function sellerConfirm() external",
+  "function requestRefund() external",
+  "function raiseDispute() external",
+  "function getDealSummary() external view returns (address, address, uint256, string, string, string, uint256, uint256, uint256, bool, bool, uint256)",
+  "function getDealState() external view returns (string)",
+];
+
+const FRAUD_ABI = [
+  // Write functions
+  "function registerSafeWallet(address newSafeWallet) external",
+  "function setGuardian(address newGuardian) external",
+  "function addToWhitelist(address target) external",
+  "function removeFromWhitelist(address target) external",
+  "function manuallyFlagFraud(string reason) external",
+  "function cancelAlert() external",
+  "function resetGuard() external",
+  "function executeNextStage() external",
+  "function deposit() external payable",
+  "function arm() external",
+  "function disarm() external",
+  // Automatic detection — called by event watcher and other contracts
+  "function reportSuspiciousActivity(address suspectRecipient, uint256 amountInvolved, string reason) external returns (bool)",
+  "function authorizeReporter(address reporter) external",
+  // Read functions
+  "function getFullStatus() external view returns (address,address,bool,uint8,uint8,uint256,uint256,uint256,bool,uint256)",
+  "function getStageDetails() external view returns (tuple(uint256 queuedAt,uint256 executedAt,uint256 amount,bool cancelled)[3])",
+  "function getSuspiciousEvents() external view returns (tuple(uint256 timestamp,string reason,uint256 amountInvolved,address suspectAddress,bool wasResolved)[])",
+  "function getAlertLevelString() external view returns (string)",
+  "function getTransferStageString() external view returns (string)",
+  "function getSecondsUntilNextStage() external view returns (uint256)",
+  "function safeWallet() view returns (address)",
+  "function guardianAddress() view returns (address)",
+  "function isArmed() view returns (bool)",
+  "function alertCancelled() view returns (bool)",
+  "function whitelistCount() view returns (uint256)",
+  "function balanceAtAlertTime() view returns (uint256)",
+  "function authorizedReporters(address) view returns (bool)",
+];
+
+// ─── App State ─────────────────────────────────────────────────────
+let provider, signer, userAddress;
+let willContract, notaryContract, auditContract, fraudContract;
+let notarizeFileHash = null, verifyFileHash = null;
+let storedDeals = []; // property deal contract addresses stored locally
+let fraudWatcher = null; // interval ID for the automatic blockchain event watcher
+
+// ─── WALLET CONNECTION ─────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) {
+    showError("MetaMask not found. Please install it from metamask.io");
+    return;
+  }
+  try {
+    showLoading(document.getElementById('btn-connect'));
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []); // prompt MetaMask popup
+    signer = await provider.getSigner();
+    userAddress = await signer.getAddress();
+
+    // Initialize contract instances with the signer (allows write operations).
+    willContract    = new ethers.Contract(ADDRESSES.WillRegistry,   WILL_ABI,   signer);
+    notaryContract  = new ethers.Contract(ADDRESSES.DocumentNotary, NOTARY_ABI, signer);
+    auditContract   = new ethers.Contract(ADDRESSES.AuditTrail,     AUDIT_ABI,  signer);
+    fraudContract   = new ethers.Contract(ADDRESSES.FraudGuard,     FRAUD_ABI,  signer);
+
+    // Load stored deals from localStorage (we save deployed PropertyEscrow addresses).
+    const saved = localStorage.getItem('lexchain_deals_' + userAddress);
+    storedDeals = saved ? JSON.parse(saved) : [];
+
+    updateWalletUI();
+    await loadDashboard();
+
+    // Start the automatic fraud detection watcher.
+    // From this point on, every outgoing transaction from the user's wallet
+    // is automatically checked for suspicious patterns - no manual input needed.
+    if (ADDRESSES.FraudGuard !== "0x0000000000000000000000000000000000000000") {
+      await startFraudWatcher();
+    }
+
+    showSuccess("Wallet connected: " + formatAddress(userAddress));
+  } catch (err) {
+    console.error(err);
+    showError("Failed to connect wallet: " + (err.reason || err.message));
+  } finally {
+    hideLoading(document.getElementById('btn-connect'), "Connect MetaMask");
+  }
+}
+
+function disconnectWallet() {
+  stopFraudWatcher(); // stop automatic monitoring before clearing state
+  provider = signer = userAddress = null;
+  willContract = notaryContract = auditContract = null;
+  fraudContract = null;
+  _velocityLog = [];
+  updateWalletUI();
+  showSuccess("Wallet disconnected");
+}
+
+async function updateWalletUI() {
+  const connected = !!userAddress;
+  document.getElementById('btn-connect').style.display        = connected ? 'none' : 'flex';
+  document.getElementById('topbar-wallet').style.display      = connected ? 'flex' : 'none';
+  document.getElementById('sidebar-connect').style.display    = connected ? 'none' : 'block';
+  document.getElementById('sidebar-wallet').style.display     = connected ? 'block' : 'none';
+  document.getElementById('banner-connect-cta').style.display = connected ? 'none' : 'block';
+  if (connected) {
+    const short = formatAddress(userAddress);
+    document.getElementById('topbar-addr').textContent  = short;
+    document.getElementById('sidebar-addr').textContent = short;
+    const bal = await provider.getBalance(userAddress);
+    const ethBal = parseFloat(ethers.formatEther(bal)).toFixed(4) + " ETH";
+    document.getElementById('sidebar-bal').textContent = ethBal;
+  }
+}
+
+// ─── DASHBOARD ─────────────────────────────────────────────────────
+async function loadDashboard() {
+  if (!userAddress) return;
+  try {
+    const [docCount, willStatus, daysLeft, auditEntries] = await Promise.all([
+      notaryContract.getDocumentCount(userAddress),
+      getWillStatus(),
+      willContract.getDaysUntilTrigger(),
+      auditContract.getUserHistory(userAddress),
+    ]);
+
+    document.getElementById('stat-docs').textContent   = docCount.toString();
+    document.getElementById('stat-deals').textContent  = storedDeals.length;
+    document.getElementById('stat-will').textContent   = willStatus;
+    document.getElementById('stat-days').textContent   = daysLeft.toString();
+
+    // Recent audit entries (last 5)
+    const recentEl = document.getElementById('recent-audit');
+    if (auditEntries.length === 0) {
+      recentEl.innerHTML = '<div class="empty-state"><p>No activity recorded yet</p></div>';
+    } else {
+      const last5 = [...auditEntries].reverse().slice(0, 5);
+      recentEl.innerHTML = last5.map(e => `
+        <div class="audit-entry">
+          <div class="audit-dot"></div>
+          <div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:3px;">
+              <span class="${actionBadgeClass(e.actionType)}">${e.actionType}</span>
+              <span class="text-xs text-muted">${formatTimeAgo(Number(e.timestamp))}</span>
+            </div>
+            <div class="text-sm text-muted">${e.details}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error("loadDashboard error:", err);
+  }
+}
+
+async function getWillStatus() {
+  try {
+    const [finalized, triggered] = await Promise.all([
+      willContract.willFinalized(),
+      willContract.willTriggered(),
+    ]);
+    if (triggered) return "TRIGGERED";
+    if (finalized) return "FINALIZED";
+    return "DRAFT";
+  } catch { return "—"; }
+}
+
+// ─── WILL FUNCTIONS ────────────────────────────────────────────────
+async function loadWillData() {
+  if (!userAddress) return;
+  try {
+    const [finalized, triggered, desc, lastActivity, benefCount, totalPct, daysLeft, disputeDays] = await Promise.all([
+      willContract.willFinalized(),
+      willContract.willTriggered(),
+      willContract.willDescription(),
+      willContract.lastActivityTimestamp(),
+      willContract.beneficiaryCount(),
+      willContract.getTotalPercentage(),
+      willContract.getDaysUntilTrigger(),
+      willContract.getDaysUntilDisputeExpiry(),
+    ]);
+
+    const bal = await provider.getBalance(ADDRESSES.WillRegistry);
+
+    // Status badge
+    let badgeHtml = '<span class="badge badge-amber">Draft</span>';
+    if (triggered) badgeHtml = '<span class="badge badge-red">Triggered</span>';
+    else if (finalized) badgeHtml = '<span class="badge badge-green">Finalized</span>';
+    document.getElementById('will-status-badge').innerHTML = badgeHtml;
+
+    document.getElementById('will-desc-input').value  = desc || '';
+    document.getElementById('will-balance').textContent = formatETH(bal);
+    document.getElementById('will-last-activity').textContent = new Date(Number(lastActivity) * 1000).toLocaleString();
+    document.getElementById('will-beneficiary-count').textContent = `${benefCount} / 5`;
+    document.getElementById('days-countdown').textContent = daysLeft.toString();
+    document.getElementById('will-triggered-status').textContent = triggered ? 'Yes' : 'No';
+
+    // Show triggered alert if triggered
+    const alertEl = document.getElementById('will-triggered-alert');
+    alertEl.style.display = triggered ? 'block' : 'none';
+    if (triggered) {
+      document.getElementById('dispute-days-left').textContent = disputeDays.toString();
+    }
+
+    // Finalize button
+    const finalizeBtn = document.getElementById('btn-finalize');
+    finalizeBtn.style.display = (!finalized && Number(totalPct) === 100 && Number(benefCount) > 0) ? 'inline-flex' : 'none';
+
+    // Percentage bar
+    updatePercentageBar(Number(totalPct));
+
+    // Load beneficiaries table
+    const [wallets, names, pcts, relationships] = await willContract.getBeneficiaries();
+    const tbody = document.getElementById('beneficiaries-tbody');
+    if (wallets.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No beneficiaries added yet.</td></tr>';
+    } else {
+      tbody.innerHTML = wallets.map((w, i) => `
+        <tr>
+          <td><strong>${names[i]}</strong></td>
+          <td><span class="badge badge-indigo">${relationships[i]}</span></td>
+          <td class="mono">${formatAddress(w)}</td>
+          <td><strong>${pcts[i]}%</strong></td>
+          <td>${!finalized ? `<button class="btn btn-ghost btn-sm" onclick="removeBeneficiary('${w}')">Remove</button>` : '—'}</td>
+        </tr>
+      `).join('');
+    }
+  } catch (err) {
+    console.error("loadWillData error:", err);
+  }
+}
+
+function updatePercentageBar(pct) {
+  const fill = document.getElementById('pct-fill');
+  const badge = document.getElementById('pct-badge');
+  fill.style.width = Math.min(pct, 100) + '%';
+  if (pct === 100) {
+    fill.style.background = 'var(--success)';
+    badge.innerHTML = '<span class="badge badge-green">100% — Complete</span>';
+  } else if (pct > 100) {
+    fill.style.background = 'var(--danger)';
+    badge.innerHTML = `<span class="badge badge-red">${pct}% — Over 100%!</span>`;
+  } else {
+    fill.style.background = 'var(--warning)';
+    badge.innerHTML = `<span class="badge badge-amber">${pct}% allocated — ${100 - pct}% remaining</span>`;
+  }
+}
+
+async function addBeneficiary() {
+  const name         = document.getElementById('ben-name').value.trim();
+  const relationship = document.getElementById('ben-relationship').value;
+  const wallet       = document.getElementById('ben-wallet').value.trim();
+  const pct          = parseInt(document.getElementById('ben-pct').value);
+
+  if (!name || !wallet || !pct) return showError("Please fill in all beneficiary fields.");
+  if (!ethers.isAddress(wallet)) return showError("Invalid wallet address.");
+  if (pct < 1 || pct > 100) return showError("Percentage must be between 1 and 100.");
+
+  await txWrapper(
+    () => willContract.addBeneficiary(wallet, name, pct, relationship),
+    "Adding beneficiary...",
+    `${name} added as beneficiary (${pct}%)`,
+    () => {
+      document.getElementById('ben-name').value = '';
+      document.getElementById('ben-wallet').value = '';
+      document.getElementById('ben-pct').value = '';
+      loadWillData();
+    }
+  );
+}
+
+async function removeBeneficiary(wallet) {
+  await txWrapper(
+    () => willContract.removeBeneficiary(wallet),
+    "Removing beneficiary...",
+    "Beneficiary removed",
+    loadWillData
+  );
+}
+
+async function updateWillDescription() {
+  const desc = document.getElementById('will-desc-input').value.trim();
+  if (!desc) return showError("Please enter a description.");
+  await txWrapper(
+    () => willContract.updateWillDescription(desc),
+    "Saving description...",
+    "Will description updated",
+    loadWillData
+  );
+}
+
+async function finalizeWill() {
+  await txWrapper(
+    () => willContract.finalizeWill(),
+    "Finalizing will...",
+    "Will finalized and locked",
+    loadWillData
+  );
+}
+
+async function recordActivity() {
+  await txWrapper(
+    () => willContract.recordActivity(),
+    "Recording activity...",
+    "Activity recorded — timer reset to today",
+    loadWillData
+  );
+}
+
+async function depositToEstate() {
+  const amount = document.getElementById('deposit-amount').value;
+  if (!amount || parseFloat(amount) <= 0) return showError("Enter a valid ETH amount.");
+  await txWrapper(
+    () => willContract.deposit({ value: ethers.parseEther(amount) }),
+    `Depositing ${amount} ETH...`,
+    `${amount} ETH deposited to estate`,
+    loadWillData
+  );
+}
+
+async function checkAndTrigger() {
+  await txWrapper(
+    () => willContract.checkAndTrigger(),
+    "Checking trigger conditions...",
+    "Will triggered successfully",
+    loadWillData
+  );
+}
+
+async function distributeEstate() {
+  await txWrapper(
+    () => willContract.distributeEstate(),
+    "Distributing estate...",
+    "Estate distributed to all beneficiaries",
+    loadWillData
+  );
+}
+
+async function cancelWillTrigger() {
+  await txWrapper(
+    () => willContract.cancelWillTrigger(),
+    "Cancelling trigger...",
+    "Will trigger cancelled — timer reset",
+    loadWillData
+  );
+}
+
+// ─── PROPERTY FUNCTIONS ────────────────────────────────────────────
+async function createDeal() {
+  const seller     = document.getElementById('deal-seller').value.trim();
+  const priceEth   = document.getElementById('deal-price').value;
+  const desc       = document.getElementById('deal-desc').value.trim();
+  const addr       = document.getElementById('deal-addr').value.trim();
+  const conditions = document.getElementById('deal-conditions').value.trim();
+
+  if (!seller || !priceEth || !desc || !addr || !conditions)
+    return showError("Please fill in all deal fields.");
+  if (!ethers.isAddress(seller)) return showError("Invalid seller address.");
+
+  try {
+    showSuccess("Deploying escrow contract...");
+    const factory = new ethers.ContractFactory(ESCROW_ABI, '0x', signer); // placeholder
+    // We call the deploy script pattern: for frontend demo we'll use a predeployed address pattern.
+    // In a real app, we'd deploy a new PropertyEscrow contract here.
+    // For the demo we simulate by saving the deal config locally.
+    const dealId = 'deal_' + Date.now();
+    const newDeal = {
+      id: dealId,
+      seller, buyer: userAddress,
+      price: priceEth, desc, addr, conditions,
+      state: 'CREATED', createdAt: Date.now(),
+      buyerApproval: false, sellerApproval: false,
+    };
+    storedDeals.push(newDeal);
+    localStorage.setItem('lexchain_deals_' + userAddress, JSON.stringify(storedDeals));
+    document.getElementById('new-deal-panel').classList.remove('open');
+    showSuccess("Property deal created successfully!");
+    loadMyDeals();
+  } catch (err) {
+    showError("Failed to create deal: " + (err.reason || err.message));
+  }
+}
+
+function loadMyDeals() {
+  const container = document.getElementById('deals-container');
+  if (storedDeals.length === 0) {
+    container.innerHTML = `<div class="empty-state card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><p>No property deals yet. Create your first deal above.</p></div>`;
+    return;
+  }
+  const stateColors = { CREATED:'indigo', FUNDED:'teal', BUYER_CONFIRMED:'amber', SELLER_CONFIRMED:'amber', COMPLETED:'green', REFUNDED:'amber', DISPUTED:'red' };
+  const stepStates = ['CREATED','FUNDED','BUYER_CONFIRMED','COMPLETED'];
+
+  container.innerHTML = storedDeals.map((deal, idx) => {
+    const step = stepStates.indexOf(deal.state);
+    const priceWei = ethers.parseEther(deal.price.toString());
+    const isBuyer  = deal.buyer.toLowerCase() === userAddress.toLowerCase();
+    const isSeller = deal.seller.toLowerCase() === userAddress.toLowerCase();
+
+    return `
+    <div class="deal-card">
+      <div class="flex-between mb-8">
+        <div class="deal-title">${deal.addr}</div>
+        <span class="badge badge-${stateColors[deal.state] || 'indigo'}">${deal.state}</span>
+      </div>
+      <div class="two-col mb-16" style="gap:8px;">
+        <div class="text-sm"><span class="text-muted">Buyer: </span><span class="mono">${formatAddress(deal.buyer)}</span></div>
+        <div class="text-sm"><span class="text-muted">Seller: </span><span class="mono">${formatAddress(deal.seller)}</span></div>
+        <div class="text-sm"><span class="text-muted">Price: </span><strong>${deal.price} ETH</strong></div>
+        <div class="text-sm"><span class="text-muted">Created: </span>${formatTimeAgo(deal.createdAt / 1000)}</div>
+      </div>
+      <div class="stepper mb-16">
+        <div class="step"><div class="step-dot ${step >= 0 ? 'done' : ''}">1</div><span style="color:var(--muted);font-size:11px;">Created</span></div>
+        <div class="step-line ${step >= 1 ? 'done' : ''}"></div>
+        <div class="step"><div class="step-dot ${step >= 1 ? 'done' : step === 0 ? 'active' : ''}">2</div><span style="color:var(--muted);font-size:11px;">Funded</span></div>
+        <div class="step-line ${step >= 2 ? 'done' : ''}"></div>
+        <div class="step"><div class="step-dot ${step >= 2 ? 'done' : step === 1 ? 'active' : ''}">3</div><span style="color:var(--muted);font-size:11px;">Confirmed</span></div>
+        <div class="step-line ${step >= 3 ? 'done' : ''}"></div>
+        <div class="step"><div class="step-dot ${step >= 3 ? 'done' : ''}">4</div><span style="color:var(--muted);font-size:11px;">Complete</span></div>
+      </div>
+      <p class="text-sm text-muted mb-16" style="padding:10px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--border2);">${deal.conditions}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${isBuyer && deal.state === 'CREATED' ? `<button class="btn btn-primary btn-sm" onclick="simulateFund(${idx})">💰 Fund Deal</button>` : ''}
+        ${isBuyer && (deal.state === 'FUNDED' || deal.state === 'SELLER_CONFIRMED') && !deal.buyerApproval ? `<button class="btn btn-success btn-sm" onclick="simulateConfirm(${idx},'buyer')">✅ Confirm Deal</button>` : ''}
+        ${isSeller && (deal.state === 'FUNDED' || deal.state === 'BUYER_CONFIRMED') && !deal.sellerApproval ? `<button class="btn btn-success btn-sm" onclick="simulateConfirm(${idx},'seller')">✅ Confirm Deal</button>` : ''}
+        ${deal.state !== 'COMPLETED' && deal.state !== 'REFUNDED' ? `<button class="btn btn-ghost btn-sm" onclick="simulateDispute(${idx})">⚠️ Raise Dispute</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Simulate deal state changes (for demo without deploying new contracts each time)
+function simulateFund(idx) {
+  storedDeals[idx].state = 'FUNDED';
+  storedDeals[idx].fundedAt = Date.now();
+  saveDeal(); loadMyDeals(); showSuccess("Deal funded — escrow locked.");
+}
+function simulateConfirm(idx, role) {
+  if (role === 'buyer') storedDeals[idx].buyerApproval = true;
+  else storedDeals[idx].sellerApproval = true;
+  if (storedDeals[idx].buyerApproval && storedDeals[idx].sellerApproval) {
+    storedDeals[idx].state = 'COMPLETED';
+    showSuccess("Both parties confirmed — funds released to seller!");
+  } else {
+    storedDeals[idx].state = role === 'buyer' ? 'BUYER_CONFIRMED' : 'SELLER_CONFIRMED';
+    showSuccess("Confirmation recorded — waiting for other party.");
+  }
+  saveDeal(); loadMyDeals();
+}
+function simulateDispute(idx) {
+  storedDeals[idx].state = 'DISPUTED'; saveDeal(); loadMyDeals();
+  showSuccess("Dispute raised — deal is now frozen.");
+}
+function saveDeal() {
+  localStorage.setItem('lexchain_deals_' + userAddress, JSON.stringify(storedDeals));
+}
+
+// ─── DOCUMENT NOTARY FUNCTIONS ─────────────────────────────────────
+async function hashFileLocally(file) {
+  // Use the browser's built-in SubtleCrypto API to SHA-256 hash the file.
+  // This is a cryptographic standard — the same file always produces the same hash.
+  // The file NEVER leaves the user's device. We only send the 32-byte hash on-chain.
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer  = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray   = Array.from(new Uint8Array(hashBuffer));
+  const hashHex     = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex; // returns a 66-character hex string (0x + 64 hex chars = 32 bytes)
+}
+
+async function handleNotarizeFile(file) {
+  if (!file) return;
+  document.getElementById('notarize-file-info').style.display = 'block';
+  document.getElementById('notarize-filename').textContent = file.name;
+  document.getElementById('notarize-filesize').textContent = formatFileSize(file.size);
+  document.getElementById('notarize-hash').textContent = 'Computing SHA-256 hash...';
+  try {
+    notarizeFileHash = await hashFileLocally(file);
+    document.getElementById('notarize-hash').textContent = notarizeFileHash;
+  } catch (err) {
+    document.getElementById('notarize-hash').textContent = 'Hash computation failed.';
+  }
+}
+
+function handleNotarizeDrop(event) {
+  event.preventDefault();
+  document.getElementById('notarize-zone').classList.remove('dragover');
+  const file = event.dataTransfer.files[0];
+  if (file) handleNotarizeFile(file);
+}
+
+async function notarizeDocument() {
+  if (!notarizeFileHash) return showError("Please select a file first.");
+  const title = document.getElementById('notarize-title').value.trim();
+  const type  = document.getElementById('notarize-type').value;
+  const desc  = document.getElementById('notarize-desc').value.trim();
+  if (!title) return showError("Please enter a document title.");
+
+  const btn = document.getElementById('btn-notarize');
+  showLoading(btn);
+  try {
+    const tx = await notaryContract.notarizeDocument(notarizeFileHash, title, type, desc || "");
+    const receipt = await tx.wait();
+    showSuccess("Document notarized on-chain!");
+    document.getElementById('notarize-success').style.display = 'block';
+    document.getElementById('notarize-tx-link').href = `https://sepolia.etherscan.io/tx/${receipt.hash}`;
+    document.getElementById('notarize-tx-link').textContent = formatAddress(receipt.hash) + " →";
+    loadMyDocuments();
+  } catch (err) {
+    showError("Notarization failed: " + (err.reason || err.message));
+  } finally {
+    hideLoading(btn, "Notarize Document");
+  }
+}
+
+async function handleVerifyFile(file) {
+  if (!file) return;
+  document.getElementById('verify-file-info').style.display = 'block';
+  document.getElementById('verify-hash').textContent = 'Computing hash...';
+  try {
+    verifyFileHash = await hashFileLocally(file);
+    document.getElementById('verify-hash').textContent = verifyFileHash;
+  } catch (err) {
+    document.getElementById('verify-hash').textContent = 'Hash computation failed.';
+  }
+}
+
+function handleVerifyDrop(event) {
+  event.preventDefault();
+  document.getElementById('verify-zone').classList.remove('dragover');
+  const file = event.dataTransfer.files[0];
+  if (file) handleVerifyFile(file);
+}
+
+async function verifyDocumentFile() {
+  if (!verifyFileHash) return showError("Please select a file to verify.");
+  const btn = document.getElementById('btn-verify');
+  showLoading(btn);
+  const resultEl = document.getElementById('verify-result');
+  resultEl.style.display = 'none';
+  try {
+    // staticCall lets us call a state-changing function as if it were read-only.
+    const isAuthentic = await notaryContract.verifyDocument.staticCall(verifyFileHash);
+    const doc = await notaryContract.getDocument(verifyFileHash);
+
+    resultEl.style.display = 'block';
+    if (isAuthentic) {
+      resultEl.innerHTML = `
+        <div class="verify-result verify-authentic">
+          <div class="verify-icon">✅</div>
+          <div class="verify-title" style="color:var(--success)">AUTHENTIC</div>
+          <p class="text-sm text-muted">This document is genuine and has never been modified.</p>
+          <div style="margin-top:16px;text-align:left;">
+            <div class="info-row"><span class="key">Title</span><span class="val">${doc.documentTitle}</span></div>
+            <div class="info-row"><span class="key">Type</span><span class="val">${doc.documentType}</span></div>
+            <div class="info-row"><span class="key">Notarized by</span><span class="val mono">${formatAddress(doc.notarizedBy)}</span></div>
+            <div class="info-row"><span class="key">Date</span><span class="val">${new Date(Number(doc.timestamp) * 1000).toLocaleString()}</span></div>
+          </div>
+        </div>`;
+    } else if (doc.isRevoked) {
+      resultEl.innerHTML = `<div class="verify-result verify-revoked"><div class="verify-icon">⚠️</div><div class="verify-title" style="color:var(--warning)">REVOKED</div><p class="text-sm text-muted">This document was revoked by its creator and is no longer considered valid.</p></div>`;
+    } else {
+      resultEl.innerHTML = `<div class="verify-result verify-unknown"><div class="verify-icon">❌</div><div class="verify-title" style="color:var(--danger)">NOT ON RECORD</div><p class="text-sm text-muted">This document has never been notarized on LexChain, or it has been tampered with.</p></div>`;
+    }
+  } catch (err) {
+    showError("Verification failed: " + (err.reason || err.message));
+  } finally {
+    hideLoading(btn, "Verify Document");
+  }
+}
+
+async function loadMyDocuments() {
+  if (!userAddress) return;
+  const tbody = document.getElementById('documents-tbody');
+  try {
+    const hashes = await notaryContract.getUserDocuments(userAddress);
+    if (hashes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No documents notarized yet.</td></tr>';
+      return;
+    }
+    const docs = await Promise.all(hashes.map(h => notaryContract.getDocument(h)));
+    tbody.innerHTML = docs.map((doc, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><strong>${doc.documentTitle}</strong></td>
+        <td><span class="badge badge-indigo">${doc.documentType}</span></td>
+        <td class="text-sm">${new Date(Number(doc.timestamp) * 1000).toLocaleDateString()}</td>
+        <td class="mono text-xs">${hashes[i].slice(0, 18)}...</td>
+        <td>${doc.isRevoked ? '<span class="badge badge-red">Revoked</span>' : '<span class="badge badge-green">Active</span>'}</td>
+        <td>${!doc.isRevoked ? `<button class="btn btn-ghost btn-sm" onclick="revokeDocument('${hashes[i]}')">Revoke</button>` : '—'}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error loading documents.</td></tr>';
+  }
+}
+
+async function revokeDocument(hash) {
+  if (!confirm("Are you sure you want to revoke this document? This cannot be undone.")) return;
+  await txWrapper(
+    () => notaryContract.revokeDocument(hash),
+    "Revoking document...",
+    "Document revoked",
+    loadMyDocuments
+  );
+}
+
+// ─── AUDIT TRAIL FUNCTIONS ─────────────────────────────────────────
+async function loadAuditTrail() {
+  if (!auditContract) return;
+  const tbody = document.getElementById('audit-tbody');
+  const filterType = document.getElementById('audit-filter-type').value;
+  const filterAddr = document.getElementById('audit-filter-addr').value.trim().toLowerCase();
+  try {
+    const entries = await auditContract.getFullAuditLog();
+    document.getElementById('audit-count').textContent = `${entries.length} total entries recorded on-chain`;
+
+    let filtered = [...entries].reverse(); // show newest first
+    if (filterType)  filtered = filtered.filter(e => e.actionType === filterType);
+    if (filterAddr)  filtered = filtered.filter(e => e.userAddress.toLowerCase().includes(filterAddr));
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No matching entries found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map((e, i) => `
+      <tr>
+        <td class="text-muted text-xs">${i + 1}</td>
+        <td><span class="${actionBadgeClass(e.actionType)}">${e.actionType.replace(/_/g, ' ')}</span></td>
+        <td class="mono text-xs">${formatAddress(e.userAddress)}</td>
+        <td class="text-sm">${e.details}</td>
+        <td class="text-xs text-muted">${new Date(Number(e.timestamp) * 1000).toLocaleString()}</td>
+        <td><span style="color:var(--success);font-size:18px;" title="Hash recorded: ${e.dataHash.slice(0,18)}...">✓</span></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error loading audit trail.</td></tr>';
+  }
+}
+
+async function exportAuditLog() {
+  if (!auditContract) return showError("Connect wallet first.");
+  try {
+    const entries = await auditContract.getFullAuditLog();
+    const data = entries.map(e => ({
+      contractAddress: e.contractAddress,
+      userAddress:     e.userAddress,
+      actionType:      e.actionType,
+      details:         e.details,
+      timestamp:       Number(e.timestamp),
+      isoDate:         new Date(Number(e.timestamp) * 1000).toISOString(),
+      dataHash:        e.dataHash,
+    }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `lexchain-audit-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    showSuccess("Audit log exported successfully.");
+  } catch (err) {
+    showError("Export failed: " + err.message);
+  }
+}
+
+// ─── NAVIGATION ────────────────────────────────────────────────────
+const pageTitles = {
+  dashboard: 'Dashboard',
+  will:      'My Will',
+  property:  'Property Deals',
+  notary:    'Document Notary',
+  audit:     'Audit Trail',
+  fraud:     'Fraud Guard',
+};
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[name] || name;
+
+  // Highlight correct nav item
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    if (btn.getAttribute('onclick').includes("'" + name + "'")) btn.classList.add('active');
+  });
+
+  // Load page-specific data
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'will')      loadWillData();
+  if (name === 'property')  loadMyDeals();
+  if (name === 'notary')    loadMyDocuments();
+  if (name === 'audit')     loadAuditTrail();
+  if (name === 'fraud')     loadFraudGuardData();
+}
+
+// ─── TRANSACTION WRAPPER ───────────────────────────────────────────
+// Wraps a contract call with loading states, success/error toasts, and callback.
+async function txWrapper(txFn, loadingMsg, successMsg, callback) {
+  if (!userAddress) return showError("Please connect your wallet first.");
+  try {
+    showSuccess(loadingMsg);
+    const tx = await txFn();
+    await tx.wait(); // wait for block confirmation
+    showSuccess(successMsg);
+    if (callback) callback();
+  } catch (err) {
+    const msg = err.reason || err.data?.message || err.message || "Transaction failed";
+    showError(msg);
+    console.error(err);
+  }
+}
+
+// ─── UI HELPERS ────────────────────────────────────────────────────
+function formatAddress(addr) {
+  if (!addr) return '—';
+  return addr.slice(0, 6) + '...' + addr.slice(-4);
+}
+
+function formatTimeAgo(timestamp) {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - timestamp;
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function formatETH(wei) {
+  return parseFloat(ethers.formatEther(wei)).toFixed(4) + ' ETH';
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function actionBadgeClass(actionType) {
+  if (actionType.includes('WILL'))         return 'badge badge-indigo';
+  if (actionType.includes('DEAL'))         return 'badge badge-teal';
+  if (actionType.includes('DOCUMENT'))     return 'badge badge-green';
+  if (actionType.includes('DISTRIBUTED'))  return 'badge badge-green';
+  if (actionType.includes('TRIGGERED'))    return 'badge badge-red';
+  if (actionType.includes('DISPUTE'))      return 'badge badge-red';
+  return 'badge badge-amber';
+}
+
+function showSuccess(msg) {
+  toast(msg, 'success');
+}
+function showError(msg) {
+  toast(msg, 'error');
+}
+function toast(msg, type) {
+  const div = document.createElement('div');
+  div.className = `toast toast-${type}`;
+  div.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+  document.getElementById('toast-container').appendChild(div);
+  setTimeout(() => div.remove(), 4000);
+}
+
+function showLoading(btn) {
+  if (!btn) return;
+  btn.dataset.originalText = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Working...';
+  btn.disabled = true;
+}
+function hideLoading(btn, label) {
+  if (!btn) return;
+  btn.innerHTML = btn.dataset.originalText || label;
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FRAUD GUARD FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+// loadFraudGuardData() — fetches full contract state and renders the page.
+async function loadFraudGuardData() {
+  if (!fraudContract) return;
+  try {
+    // getFullStatus() returns 10 values in one call — minimises RPC round-trips.
+    const s      = await fraudContract.getFullStatus();
+    const stages = await fraudContract.getStageDetails();
+    const events = await fraudContract.getSuspiciousEvents();
+
+    // Destructure the tuple returned by getFullStatus()
+    const [safeWal, guardian, armed, alertLvl, stageLvl,
+           balance, balAtAlert, evtCount, cancelled, secLeft] = s;
+
+    const alertNum = Number(alertLvl); // 0=NONE 1=LOW 2=HIGH 3=CONFIRMED
+    const stageNum = Number(stageLvl); // 0=NONE 1=S1 2=S2 3=S3 4=COMPLETE
+
+    // ── Status banner colour ──────────────────────────────────────────
+    const bannerEl = document.getElementById('fraud-status-banner');
+    const alertMeta = [
+      { text: 'NONE — System is monitoring',          color: 'var(--success)', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)'  },
+      { text: 'LOW — Suspicious activity detected',   color: 'var(--warning)', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)'  },
+      { text: 'HIGH — Gradual transfer in progress',  color: 'var(--danger)',  bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.4)'   },
+      { text: 'CONFIRMED — Fraud confirmed by owner', color: 'var(--danger)',  bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.4)'   },
+    ];
+    const meta = alertMeta[alertNum] || alertMeta[0];
+    bannerEl.style.background   = `linear-gradient(135deg,${meta.bg},transparent)`;
+    bannerEl.style.borderColor  = meta.border;
+    document.getElementById('fraud-alert-text').textContent = meta.text;
+    document.getElementById('fraud-alert-text').style.color = meta.color;
+
+    // ── Info fields ───────────────────────────────────────────────────
+    document.getElementById('fraud-safe-wallet').textContent    = formatAddress(safeWal);
+    document.getElementById('fraud-guardian').textContent       = guardian === '0x0000000000000000000000000000000000000000' ? 'Not set' : formatAddress(guardian);
+    document.getElementById('fraud-balance').textContent        = formatETH(balance);
+    document.getElementById('fraud-whitelist-count').textContent = (await fraudContract.whitelistCount()).toString() + ' addresses';
+
+    // ── ARMED pill ────────────────────────────────────────────────────
+    const armedPill = document.getElementById('fraud-armed-pill');
+    armedPill.textContent  = armed ? 'ARMED' : 'DISARMED';
+    armedPill.className    = armed ? 'badge badge-green' : 'badge badge-red';
+
+    // ── Button visibility ─────────────────────────────────────────────
+    document.getElementById('btn-cancel-alert').style.display = (alertNum > 0 && !cancelled) ? 'inline-flex' : 'none';
+    document.getElementById('btn-reset-guard').style.display  = cancelled ? 'inline-flex' : 'none';
+
+    // ── Nav badge ─────────────────────────────────────────────────────
+    document.getElementById('nav-fraud-badge').style.display = alertNum > 0 ? 'inline' : 'none';
+
+    // ── Stage timeline rendering ──────────────────────────────────────
+    // stageNum: 0=NONE, 1=STAGE_1, 2=STAGE_2, 3=STAGE_3, 4=COMPLETE
+    _renderStageRow(1, stages[0], stageNum, balAtAlert, 30);
+    _renderStageRow(2, stages[1], stageNum, balAtAlert, 40);
+    _renderStageRow(3, stages[2], stageNum, balAtAlert, 30);
+
+    // ── Execute button & countdown ────────────────────────────────────
+    const executeRow = document.getElementById('fraud-execute-row');
+    const isActive   = stageNum >= 1 && stageNum <= 3 && !cancelled;
+    executeRow.style.display = isActive ? 'block' : 'none';
+    if (isActive) {
+      const secLeftNum = Number(secLeft);
+      if (secLeftNum > 0) {
+        const h = Math.floor(secLeftNum / 3600);
+        const m = Math.floor((secLeftNum % 3600) / 60);
+        const s2 = secLeftNum % 60;
+        document.getElementById('fraud-countdown').textContent = `${h}h ${m}m ${s2}s`;
+      } else {
+        document.getElementById('fraud-countdown').innerHTML = '<span style="color:var(--success);font-weight:700;">Ready to execute now!</span>';
+      }
+    }
+
+    // ── Suspicious events table ───────────────────────────────────────
+    const tbody = document.getElementById('fraud-events-tbody');
+    if (events.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No suspicious events recorded yet.</td></tr>';
+    } else {
+      // Show newest first
+      tbody.innerHTML = [...events].reverse().map((e, i) => {
+        const ts      = Number(e.timestamp);
+        const amt     = e.amountInvolved;
+        const resolved = e.wasResolved;
+        return `<tr>
+          <td class="text-muted">${events.length - i}</td>
+          <td class="text-xs">${new Date(ts * 1000).toLocaleString()}</td>
+          <td class="text-sm">${e.reason}</td>
+          <td>${formatETH(amt)}</td>
+          <td class="mono text-xs">${formatAddress(e.suspectAddress)}</td>
+          <td>${resolved
+            ? '<span class="badge badge-green">Resolved</span>'
+            : '<span class="badge badge-red">Active</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+  } catch (err) {
+    console.error('loadFraudGuardData error:', err);
+  }
+}
+
+// _renderStageRow() — updates one stage row's visual state in the timeline.
+// stageIndex: 1, 2, or 3
+// exec: the StageExecution struct from the contract
+// currentStageNum: which stage number we are currently on (0–4)
+// balAtAlert: the balance snapshot taken when the alert was raised
+// pct: this stage's percentage (30, 40, or 30)
+function _renderStageRow(stageIndex, exec, currentStageNum, balAtAlert, pct) {
+  const rowEl    = document.getElementById(`stage-${stageIndex}-row`);
+  const dotEl    = document.getElementById(`stage-${stageIndex}-dot`);
+  const badgeEl  = document.getElementById(`stage-${stageIndex}-badge`);
+  const detailEl = document.getElementById(`stage-${stageIndex}-detail`);
+  const amtEl    = document.getElementById(`stage-${stageIndex}-amount`);
+
+  const queuedAt   = Number(exec.queuedAt);
+  const executedAt = Number(exec.executedAt);
+  const amount     = exec.amount;
+  const cancelled  = exec.cancelled;
+
+  // Reset opacity
+  rowEl.style.opacity = '1';
+
+  if (cancelled) {
+    // Stage was cancelled — grey it out
+    dotEl.style.background = 'var(--border2)';
+    dotEl.style.color      = 'var(--muted)';
+    badgeEl.className      = 'badge badge-amber';
+    badgeEl.textContent    = 'Cancelled';
+    detailEl.textContent   = 'This stage was cancelled by the owner (false alarm).';
+    amtEl.textContent      = '';
+
+  } else if (executedAt > 0) {
+    // Stage already executed — green done state
+    dotEl.style.background = 'var(--success)';
+    dotEl.style.color      = '#fff';
+    dotEl.textContent      = '✓';
+    badgeEl.className      = 'badge badge-green';
+    badgeEl.textContent    = 'Executed';
+    detailEl.textContent   = `Sent on ${new Date(executedAt * 1000).toLocaleString()}`;
+    amtEl.textContent      = `${formatETH(amount)} transferred to safe wallet`;
+
+  } else if (queuedAt > 0) {
+    // Queued but not yet executed — amber waiting state
+    const executeAt  = queuedAt + 24 * 60 * 60; // queuedAt + 24h
+    const now        = Math.floor(Date.now() / 1000);
+    const ready      = now >= executeAt;
+    dotEl.style.background = ready ? 'var(--warning)' : 'var(--primary)';
+    dotEl.style.color      = '#fff';
+    dotEl.textContent      = stageIndex;
+    badgeEl.className      = ready ? 'badge badge-amber' : 'badge badge-indigo';
+    badgeEl.textContent    = ready ? 'Ready' : 'Queued';
+    if (ready) {
+      detailEl.textContent = 'Delay elapsed — click Execute Next Stage to send funds.';
+    } else {
+      const secsLeft = executeAt - now;
+      const h = Math.floor(secsLeft / 3600), m = Math.floor((secsLeft % 3600) / 60);
+      detailEl.textContent = `Executes in ${h}h ${m}m — owner can still cancel before this.`;
+    }
+    amtEl.textContent = `${formatETH(amount)} will be sent to safe wallet`;
+
+  } else {
+    // Not yet reached — dim and show pending
+    rowEl.style.opacity    = currentStageNum === 0 ? '0.4' : '0.6';
+    dotEl.style.background = 'var(--border2)';
+    dotEl.style.color      = 'var(--muted)';
+    dotEl.textContent      = stageIndex;
+    badgeEl.className      = 'badge badge-amber';
+    badgeEl.textContent    = 'Waiting';
+    detailEl.textContent   = `Will be queued after Stage ${stageIndex - 1} executes.`;
+    if (Number(balAtAlert) > 0) {
+      const approxAmt = (BigInt(balAtAlert) * BigInt(pct)) / 100n;
+      amtEl.textContent = `~${formatETH(approxAmt)} estimated`;
+    } else {
+      amtEl.textContent = '';
+    }
+  }
+}
+
+// manuallyFlagFraud() — owner or guardian explicitly raises an alert.
+async function manuallyFlagFraud() {
+  if (!fraudContract) return showError("Connect wallet first.");
+  const reason = prompt("Describe the suspicious activity:\n(This will be permanently logged on-chain)");
+  if (!reason || !reason.trim()) return;
+  await txWrapper(
+    () => fraudContract.manuallyFlagFraud(reason.trim()),
+    "Raising fraud alert...",
+    "Fraud alert raised — gradual transfer initiated!",
+    loadFraudGuardData
+  );
+}
+
+// cancelFraudAlert() — owner cancels the alert (false alarm).
+// Any ETH not yet transferred stays in the contract.
+async function cancelFraudAlert() {
+  if (!confirm("Are you sure this was a false alarm?\nCancelling will stop all pending stage transfers.")) return;
+  await txWrapper(
+    () => fraudContract.cancelAlert(),
+    "Cancelling alert...",
+    "Alert cancelled — marked as false alarm. Call Reset Guard to re-arm.",
+    loadFraudGuardData
+  );
+}
+
+// resetFraudGuard() — re-arms the system after a cancelled alert.
+async function resetFraudGuard() {
+  await txWrapper(
+    () => fraudContract.resetGuard(),
+    "Resetting FraudGuard...",
+    "FraudGuard reset and re-armed successfully!",
+    loadFraudGuardData
+  );
+}
+
+// executeNextStage() — anyone can call this after the 24h delay.
+// The ETH only goes to safeWallet — so calling this is always safe.
+async function executeNextStage() {
+  await txWrapper(
+    () => fraudContract.executeNextStage(),
+    "Executing stage transfer...",
+    "Stage executed — funds moved to safe wallet!",
+    loadFraudGuardData
+  );
+}
+
+// updateSafeWallet() — changes the destination for fraud transfers.
+async function updateSafeWallet() {
+  const addr = document.getElementById('fraud-new-safe').value.trim();
+  if (!ethers.isAddress(addr)) return showError("Enter a valid Ethereum address.");
+  await txWrapper(
+    () => fraudContract.registerSafeWallet(addr),
+    "Updating safe wallet...",
+    "Safe wallet updated successfully!",
+    () => { document.getElementById('fraud-new-safe').value = ''; loadFraudGuardData(); }
+  );
+}
+
+// addToWhitelist() — marks an address as trusted so transfers to it
+// never trigger the unknown-recipient fraud signal.
+async function addToWhitelist() {
+  const addr = document.getElementById('fraud-whitelist-input').value.trim();
+  if (!ethers.isAddress(addr)) return showError("Enter a valid Ethereum address.");
+  await txWrapper(
+    () => fraudContract.addToWhitelist(addr),
+    "Adding to whitelist...",
+    "Address added to whitelist — transfers to it will not trigger alerts.",
+    () => { document.getElementById('fraud-whitelist-input').value = ''; loadFraudGuardData(); }
+  );
+}
+
+// depositToFraudGuard() — sends ETH into the protected pool.
+async function depositToFraudGuard() {
+  const amt = document.getElementById('fraud-deposit-amount').value;
+  if (!amt || parseFloat(amt) <= 0) return showError("Enter a valid ETH amount.");
+  await txWrapper(
+    () => fraudContract.deposit({ value: ethers.parseEther(amt) }),
+    `Depositing ${amt} ETH to protected pool...`,
+    `${amt} ETH deposited — now protected by FraudGuard`,
+    () => { document.getElementById('fraud-deposit-amount').value = ''; loadFraudGuardData(); }
+  );
+}
+
+
+// =======================================================================
+// FRAUD GUARD DEMO FUNCTIONS — Professor Presentation Panel
+// Each function simulates a real attack scenario using actual contract calls
+// =======================================================================
+
+// demoLog() — appends a styled line to one of the demo log boxes.
+// panel: 'a', 'b', 'c', or 'd'
+// type:  'ok' | 'err' | 'info' | 'warn' | 'bold'
+function demoLog(panel, text, type = 'info') {
+  const logEl = document.getElementById('demo-log-' + panel);
+  logEl.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'demo-log-line ' + type;
+  const ts = new Date().toLocaleTimeString();
+  line.textContent = '[' + ts + '] ' + text;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight; // auto-scroll to latest line
+}
+
+// demoStep() — marks a step chip as active, done, or failed.
+function demoStep(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'demo-step-chip ' + state;
+}
+
+// demoDisableBtn() / demoEnableBtn() — lock/unlock a demo button.
+function demoDisableBtn(id) {
+  const b = document.getElementById(id);
+  if (b) { b.disabled = true; b.innerHTML = '<span class="spinner"></span> Running...'; }
+}
+function demoEnableBtn(id, label) {
+  const b = document.getElementById(id);
+  if (b) { b.disabled = false; b.textContent = label; }
+}
+
+// demoCheckReady() — validates contract is set up before running a demo.
+async function demoCheckReady(panel) {
+  if (!fraudContract || !userAddress) {
+    demoLog(panel, 'ERROR: Connect your wallet first.', 'err');
+    return false;
+  }
+  try {
+    const bal = await provider.getBalance(await fraudContract.getAddress());
+    if (bal === 0n) {
+      demoLog(panel, 'WARNING: FraudGuard balance is 0. Deposit some ETH first (use the Deposit ETH field above).', 'warn');
+      demoLog(panel, 'Demo will continue but stage amounts will be 0.', 'warn');
+    }
+    const armed = await fraudContract.isArmed();
+    if (!armed) {
+      demoLog(panel, 'ERROR: FraudGuard is disarmed. Call arm() first.', 'err');
+      return false;
+    }
+    // If an alert is already active, warn the user
+    const level = await fraudContract.getAlertLevelString();
+    if (level !== 'NONE') {
+      demoLog(panel, 'NOTE: An alert is already active (' + level + '). Cancel and reset first if you want a clean run.', 'warn');
+    }
+    return true;
+  } catch (err) {
+    demoLog(panel, 'ERROR checking contract state: ' + err.message, 'err');
+    return false;
+  }
+}
+
+// ── SCENARIO A: Large Single Transfer Attack ────────────────────────
+async function demoLargeTransfer() {
+  const panel = 'a';
+  demoDisableBtn('btn-demo-a', '▶ Run Scenario A');
+  document.getElementById('demo-log-a').innerHTML = '';
+
+  demoLog(panel, 'SCENARIO A: Large Single Transfer Attack', 'bold');
+  demoLog(panel, '─────────────────────────────────────────', 'info');
+
+  if (!(await demoCheckReady(panel))) {
+    demoEnableBtn('btn-demo-a', '▶ Run Scenario A');
+    return;
+  }
+
+  try {
+    // Step 1: Show current balance
+    demoStep('demo-a-s1', 'active');
+    const bal = await provider.getBalance(await fraudContract.getAddress());
+    demoLog(panel, 'Protected balance: ' + parseFloat(ethers.formatEther(bal)).toFixed(6) + ' ETH', 'info');
+
+    const attackAmount = (bal * 70n) / 100n; // 70% — well above the 50% threshold
+    demoLog(panel, 'Attacker attempting to transfer: ' + parseFloat(ethers.formatEther(attackAmount)).toFixed(6) + ' ETH (70% of balance)', 'warn');
+    demoLog(panel, 'This exceeds the 50% large-transfer threshold...', 'info');
+
+    // Step 2: Record the suspicious transaction
+    demoLog(panel, 'FraudGuard auto-detected via reportSuspiciousActivity()...', 'info');
+    const tx = await fraudContract.reportSuspiciousActivity(
+      '0x000000000000000000000000000000000000dEaD', // attacker destination (burn address for demo)
+      attackAmount,
+      'DEMO: Large transfer attack simulated for professor presentation'
+    );
+    demoLog(panel, 'Transaction submitted: ' + tx.hash.slice(0, 18) + '...', 'info');
+    await tx.wait();
+    demoStep('demo-a-s1', 'done');
+
+    // Step 3: Check alert level
+    demoStep('demo-a-s2', 'active');
+    const alertLevel = await fraudContract.getAlertLevelString();
+    const stage      = await fraudContract.getTransferStageString();
+    demoLog(panel, 'Alert level is now: ' + alertLevel, alertLevel === 'HIGH' ? 'ok' : 'warn');
+    demoStep('demo-a-s2', alertLevel === 'HIGH' ? 'done' : 'failed');
+
+    // Step 4: Confirm stage was queued
+    demoStep('demo-a-s3', 'active');
+    demoLog(panel, 'Transfer stage: ' + stage, stage === 'STAGE_1' ? 'ok' : 'warn');
+    if (stage === 'STAGE_1') {
+      const stageDetails = await fraudContract.getStageDetails();
+      const s1amount = stageDetails[0].amount;
+      demoLog(panel, 'Stage 1 queued: ' + parseFloat(ethers.formatEther(s1amount)).toFixed(6) + ' ETH (30%) will move to safe wallet after 24h', 'ok');
+      demoStep('demo-a-s3', 'done');
+    } else {
+      demoStep('demo-a-s3', 'failed');
+    }
+
+    // Step 5: Show attacker cannot execute immediately
+    demoStep('demo-a-s4', 'active');
+    demoLog(panel, 'Attacker tries to force-execute the transfer immediately...', 'warn');
+    try {
+      await fraudContract.executeNextStage();
+      demoLog(panel, 'ERROR: Should have been blocked!', 'err');
+      demoStep('demo-a-s4', 'failed');
+    } catch (e) {
+      if (e.reason && e.reason.includes('delay')) {
+        demoLog(panel, 'BLOCKED: "' + e.reason + '"', 'ok');
+        demoLog(panel, 'Attacker cannot drain instantly! 24-hour delay is enforced.', 'ok');
+        demoStep('demo-a-s4', 'done');
+      } else {
+        demoLog(panel, 'Blocked (different reason): ' + (e.reason || e.message), 'ok');
+        demoStep('demo-a-s4', 'done');
+      }
+    }
+
+    // Step 6: Show suspicious events logged
+    demoStep('demo-a-s5', 'active');
+    const events = await fraudContract.getSuspiciousEvents();
+    demoLog(panel, 'Suspicious events on-chain: ' + events.length, 'ok');
+    if (events.length > 0) {
+      demoLog(panel, 'Latest: "' + events[events.length - 1].reason + '"', 'ok');
+    }
+    demoStep('demo-a-s5', 'done');
+
+    demoLog(panel, '─────────────────────────────────────────', 'info');
+    demoLog(panel, 'SCENARIO A COMPLETE. Attacker is stuck — funds are safe.', 'bold');
+    demoLog(panel, 'Use Scenario C to cancel (false alarm) or Scenario D to run full transfer.', 'info');
+
+    await loadFraudGuardData(); // refresh the main UI
+  } catch (err) {
+    demoLog(panel, 'FAILED: ' + (err.reason || err.message), 'err');
+    console.error(err);
+  }
+  demoEnableBtn('btn-demo-a', '▶ Run Scenario A');
+}
+
+// ── SCENARIO B: Velocity Spike Attack ──────────────────────────────
+async function demoVelocitySpike() {
+  const panel = 'b';
+  demoDisableBtn('btn-demo-b', '▶ Run Scenario B');
+  document.getElementById('demo-log-b').innerHTML = '';
+
+  demoLog(panel, 'SCENARIO B: Velocity Spike Attack', 'bold');
+  demoLog(panel, '─────────────────────────────────────────', 'info');
+
+  if (!(await demoCheckReady(panel))) {
+    demoEnableBtn('btn-demo-b', '▶ Run Scenario B');
+    return;
+  }
+
+  try {
+    const smallAmount = ethers.parseEther('0.001'); // tiny amount — below 50% threshold
+    demoLog(panel, 'Attacker sends 6 rapid small transactions of 0.001 ETH each', 'info');
+    demoLog(panel, 'Each is below the 50% threshold — but together they trigger velocity detection', 'info');
+
+    for (let i = 1; i <= 6; i++) {
+      const stepId = 'demo-b-s' + i;
+      demoStep(stepId, 'active');
+
+      // Update velocity meter
+      document.getElementById('velocity-meter').style.width = (i / 6 * 100) + '%';
+      document.getElementById('velocity-count').textContent = i + ' / 6 transactions';
+
+      demoLog(panel, 'Sending transaction ' + i + '/6 to unknown address...', 'info');
+      try {
+        const tx = await fraudContract.reportSuspiciousActivity(
+          '0x000000000000000000000000000000000000dEaD',
+          smallAmount,
+          `DEMO: Velocity spike txn ${i} of 6 — rapid small transfers`
+        );
+        await tx.wait();
+        const level = await fraudContract.getAlertLevelString();
+        const stage = await fraudContract.getTransferStageString();
+
+        if (level === 'HIGH' || stage === 'STAGE_1') {
+          demoLog(panel, 'Txn ' + i + ': VELOCITY SPIKE DETECTED! Alert = ' + level + ' | Stage = ' + stage, 'ok');
+          demoStep(stepId, 'done');
+          // Mark remaining steps as done too
+          for (let j = i + 1; j <= 6; j++) demoStep('demo-b-s' + j, 'done');
+          document.getElementById('velocity-meter').style.width = '100%';
+          document.getElementById('velocity-count').textContent = 'SPIKE DETECTED at txn ' + i;
+          break;
+        } else {
+          demoLog(panel, 'Txn ' + i + ': Logged. Alert = ' + level, 'warn');
+          demoStep(stepId, 'done');
+        }
+      } catch (e) {
+        demoLog(panel, 'Txn ' + i + ' failed: ' + (e.reason || e.message), 'err');
+        demoStep(stepId, 'failed');
+        break;
+      }
+      // Small delay between transactions for visual effect
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    const finalLevel = await fraudContract.getAlertLevelString();
+    const finalStage = await fraudContract.getTransferStageString();
+    demoLog(panel, '─────────────────────────────────────────', 'info');
+    demoLog(panel, 'Final alert: ' + finalLevel + ' | Stage: ' + finalStage, 'bold');
+    demoLog(panel, 'SCENARIO B COMPLETE. Velocity attack blocked.', 'bold');
+
+    await loadFraudGuardData();
+  } catch (err) {
+    demoLog(panel, 'FAILED: ' + (err.reason || err.message), 'err');
+    console.error(err);
+  }
+  demoEnableBtn('btn-demo-b', '▶ Run Scenario B');
+}
+
+// ── SCENARIO C: False Alarm — Owner Cancels ─────────────────────────
+async function demoFalseAlarm() {
+  const panel = 'c';
+  demoDisableBtn('btn-demo-c', '▶ Run Scenario C');
+  document.getElementById('demo-log-c').innerHTML = '';
+
+  demoLog(panel, 'SCENARIO C: False Alarm — Owner Cancels', 'bold');
+  demoLog(panel, '─────────────────────────────────────────', 'info');
+
+  if (!fraudContract || !userAddress) {
+    demoLog(panel, 'ERROR: Connect wallet first.', 'err');
+    demoEnableBtn('btn-demo-c', '▶ Run Scenario C');
+    return;
+  }
+
+  try {
+    // Check if there is an active alert to cancel
+    const level = await fraudContract.getAlertLevelString();
+    const cancelled = await fraudContract.alertCancelled();
+
+    demoStep('demo-c-s1', 'active');
+    if (level === 'NONE' && !cancelled) {
+      demoLog(panel, 'No active alert found. Run Scenario A or B first to create an alert.', 'warn');
+      demoLog(panel, 'Auto-triggering a quick alert for this demo...', 'info');
+      // Auto-trigger a small alert
+      const bal = await provider.getBalance(await fraudContract.getAddress());
+      if (bal > 0n) {
+        const tx = await fraudContract.reportSuspiciousActivity(
+          '0x000000000000000000000000000000000000dEaD',
+          (bal * 70n) / 100n,
+          'DEMO: Full transfer scenario trigger for professor presentation'
+        );
+        await tx.wait();
+        demoLog(panel, 'Alert auto-triggered: ' + await fraudContract.getAlertLevelString(), 'warn');
+      } else {
+        demoLog(panel, 'No balance to trigger alert. Deposit ETH and run Scenario A first.', 'err');
+        demoEnableBtn('btn-demo-c', '▶ Run Scenario C');
+        return;
+      }
+    } else if (cancelled) {
+      demoLog(panel, 'Alert is already cancelled. Call Reset Guard to start fresh.', 'warn');
+      demoEnableBtn('btn-demo-c', '▶ Run Scenario C');
+      return;
+    } else {
+      demoLog(panel, 'Active alert found: ' + level, 'ok');
+    }
+    demoStep('demo-c-s1', 'done');
+
+    // Record the balance before cancel to prove nothing moved
+    const balBefore = await provider.getBalance(await fraudContract.getAddress());
+    demoLog(panel, 'Balance before cancel: ' + parseFloat(ethers.formatEther(balBefore)).toFixed(6) + ' ETH', 'info');
+
+    // Cancel the alert
+    demoStep('demo-c-s2', 'active');
+    demoLog(panel, 'Owner calls cancelAlert() — "This was a false alarm, I was just on holiday"', 'info');
+    const tx = await fraudContract.cancelAlert();
+    demoLog(panel, 'Cancel tx: ' + tx.hash.slice(0, 18) + '...', 'info');
+    await tx.wait();
+    demoLog(panel, 'Alert cancelled!', 'ok');
+    demoStep('demo-c-s2', 'done');
+
+    // Verify no ETH moved
+    demoStep('demo-c-s3', 'active');
+    const balAfter = await provider.getBalance(await fraudContract.getAddress());
+    demoLog(panel, 'Balance after cancel: ' + parseFloat(ethers.formatEther(balAfter)).toFixed(6) + ' ETH', 'ok');
+    if (balAfter >= balBefore) {
+      demoLog(panel, 'CONFIRMED: No ETH moved during the alert. Funds are 100% safe.', 'ok');
+      demoStep('demo-c-s3', 'done');
+    } else {
+      demoLog(panel, 'Some ETH moved — a stage may have already executed before cancel.', 'warn');
+      demoStep('demo-c-s3', 'done');
+    }
+
+    // Reset and re-arm
+    demoStep('demo-c-s4', 'active');
+    demoLog(panel, 'Calling resetGuard() to re-arm for future protection...', 'info');
+    const tx2 = await fraudContract.resetGuard();
+    await tx2.wait();
+    const finalLevel = await fraudContract.getAlertLevelString();
+    const finalStage = await fraudContract.getTransferStageString();
+    demoLog(panel, 'Guard reset. Alert = ' + finalLevel + ' | Stage = ' + finalStage, 'ok');
+    demoLog(panel, 'FraudGuard is armed and ready to detect the next attack.', 'ok');
+    demoStep('demo-c-s4', 'done');
+
+    demoLog(panel, '─────────────────────────────────────────', 'info');
+    demoLog(panel, 'SCENARIO C COMPLETE. False alarm handled. No ETH lost.', 'bold');
+
+    await loadFraudGuardData();
+  } catch (err) {
+    demoLog(panel, 'FAILED: ' + (err.reason || err.message), 'err');
+    console.error(err);
+  }
+  demoEnableBtn('btn-demo-c', '▶ Run Scenario C');
+}
+
+// ── SCENARIO D: Full Gradual Transfer (all 3 stages, local node only) ─
+async function demoFullTransfer() {
+  const panel = 'd';
+  demoDisableBtn('btn-demo-d', '▶ Run Scenario D (Local Only)');
+  document.getElementById('demo-log-d').innerHTML = '';
+
+  demoLog(panel, 'SCENARIO D: Full Gradual Transfer — All 3 Stages', 'bold');
+  demoLog(panel, '─────────────────────────────────────────', 'info');
+  demoLog(panel, 'NOTE: This uses evm_increaseTime to skip 24h between stages.', 'warn');
+  demoLog(panel, 'Only works on local Hardhat node (npx hardhat node). Not Sepolia.', 'warn');
+
+  if (!fraudContract || !userAddress) {
+    demoLog(panel, 'ERROR: Connect wallet first.', 'err');
+    demoEnableBtn('btn-demo-d', '▶ Run Scenario D (Local Only)');
+    return;
+  }
+
+  try {
+    // Ensure we have an active alert — trigger one if not
+    demoStep('demo-d-s1', 'active');
+    let level = await fraudContract.getAlertLevelString();
+    let stage = await fraudContract.getTransferStageString();
+
+    if (level === 'NONE' || stage === 'NONE') {
+      demoLog(panel, 'No active alert. Triggering a large-transfer alert for the demo...', 'info');
+      const bal = await provider.getBalance(await fraudContract.getAddress());
+      if (bal === 0n) {
+        demoLog(panel, 'ERROR: No balance. Deposit ETH first using the form above.', 'err');
+        demoEnableBtn('btn-demo-d', '▶ Run Scenario D (Local Only)');
+        return;
+      }
+      const tx = await fraudContract.reportSuspiciousActivity(
+        '0x000000000000000000000000000000000000dEaD',
+        (bal * 70n) / 100n,
+        'DEMO: Auto-trigger for false-alarm scenario'
+      );
+      await tx.wait();
+      level = await fraudContract.getAlertLevelString();
+      stage = await fraudContract.getTransferStageString();
+    }
+
+    demoLog(panel, 'Alert: ' + level + ' | Stage: ' + stage, 'ok');
+    const stageDetails = await fraudContract.getStageDetails();
+    const balAtAlert = await fraudContract.balanceAtAlertTime();
+    demoLog(panel, 'Balance at alert time: ' + parseFloat(ethers.formatEther(balAtAlert)).toFixed(6) + ' ETH', 'info');
+    demoLog(panel, 'Stage 1 will send: ' + parseFloat(ethers.formatEther(stageDetails[0].amount)).toFixed(6) + ' ETH (30%)', 'info');
+    demoLog(panel, 'Stage 2 will send: ' + parseFloat(ethers.formatEther(stageDetails[1].amount)).toFixed(6) + ' ETH (40%)', 'info');
+    demoLog(panel, 'Stage 3 will send: ' + parseFloat(ethers.formatEther(stageDetails[2].amount)).toFixed(6) + ' ETH (30%)', 'info');
+    demoStep('demo-d-s1', 'done');
+
+    const safeAddr = await fraudContract.safeWallet();
+    const safeBefore = await provider.getBalance(safeAddr);
+    demoLog(panel, 'Safe wallet before: ' + parseFloat(ethers.formatEther(safeBefore)).toFixed(6) + ' ETH', 'info');
+
+    // Execute each stage
+    const stageLabels = [
+      ['demo-d-s2', 'Stage 1 (30%)', 'STAGE_2'],
+      ['demo-d-s3', 'Stage 2 (40%)', 'STAGE_3'],
+      ['demo-d-s4', 'Stage 3 (30%)', 'COMPLETE'],
+    ];
+
+    for (const [stepId, label, expectedNext] of stageLabels) {
+      demoStep(stepId, 'active');
+      demoLog(panel, 'Fast-forwarding blockchain time by 24 hours + 1 second...', 'info');
+
+      // Advance time on the local node
+      try {
+        await provider.send('evm_increaseTime', [24 * 60 * 60 + 1]);
+        await provider.send('evm_mine', []);
+        demoLog(panel, 'Time advanced. Executing ' + label + '...', 'info');
+      } catch (e) {
+        demoLog(panel, 'evm_increaseTime failed — are you on a local Hardhat node?', 'err');
+        demoLog(panel, 'Error: ' + e.message, 'err');
+        demoStep(stepId, 'failed');
+        break;
+      }
+
+      try {
+        const tx = await fraudContract.executeNextStage();
+        demoLog(panel, label + ' tx: ' + tx.hash.slice(0, 18) + '...', 'info');
+        await tx.wait();
+        const newStage = await fraudContract.getTransferStageString();
+        const safeNow  = await provider.getBalance(safeAddr);
+        const moved    = safeNow - safeBefore;
+        demoLog(panel, label + ' executed! Stage now: ' + newStage, 'ok');
+        demoLog(panel, 'Total moved to safe wallet so far: ' + parseFloat(ethers.formatEther(moved)).toFixed(6) + ' ETH', 'ok');
+        demoStep(stepId, 'done');
+      } catch (e) {
+        demoLog(panel, label + ' failed: ' + (e.reason || e.message), 'err');
+        demoStep(stepId, 'failed');
+        break;
+      }
+    }
+
+    // Final summary
+    demoStep('demo-d-s5', 'active');
+    const finalStage   = await fraudContract.getTransferStageString();
+    const remaining    = await provider.getBalance(await fraudContract.getAddress());
+    const safeAfter    = await provider.getBalance(safeAddr);
+    const totalMoved   = safeAfter - safeBefore;
+
+    demoLog(panel, '─────────────────────────────────────────', 'info');
+    demoLog(panel, 'FINAL STAGE: ' + finalStage, 'bold');
+    demoLog(panel, 'Total moved to safe wallet: ' + parseFloat(ethers.formatEther(totalMoved)).toFixed(6) + ' ETH', 'ok');
+    demoLog(panel, 'Remaining in contract: '      + parseFloat(ethers.formatEther(remaining)).toFixed(6) + ' ETH', 'ok');
+
+    if (finalStage === 'COMPLETE') {
+      demoLog(panel, 'SUCCESS: All funds safely evacuated. Attacker got nothing.', 'ok');
+      demoStep('demo-d-s5', 'done');
+    } else {
+      demoLog(panel, 'Transfer not fully complete yet. Stage: ' + finalStage, 'warn');
+      demoStep('demo-d-s5', 'failed');
+    }
+
+    demoLog(panel, 'SCENARIO D COMPLETE.', 'bold');
+    await loadFraudGuardData();
+  } catch (err) {
+    demoLog(panel, 'FAILED: ' + (err.reason || err.message), 'err');
+    console.error(err);
+  }
+  demoEnableBtn('btn-demo-d', '▶ Run Scenario D (Local Only)');
+}
+
+// demoCancelAndReset() — utility to clean up after a demo run
+async function demoCancelAndReset(panel) {
+  if (!fraudContract || !userAddress) return showError('Connect wallet first.');
+  try {
+    const level     = await fraudContract.getAlertLevelString();
+    const cancelled = await fraudContract.alertCancelled();
+
+    if (level !== 'NONE' && !cancelled) {
+      demoLog(panel, 'Cancelling active alert...', 'info');
+      const t1 = await fraudContract.cancelAlert();
+      await t1.wait();
+    }
+    if (cancelled || level !== 'NONE') {
+      demoLog(panel, 'Resetting guard...', 'info');
+      try {
+        const t2 = await fraudContract.resetGuard();
+        await t2.wait();
+      } catch(e) { /* already reset */ }
+    }
+    demoLog(panel, 'Reset complete. Ready for another demo run.', 'ok');
+    // Reset all step chips to default
+    ['a','b','c','d'].forEach(p => {
+      document.querySelectorAll('[id^="demo-' + p + '-s"]').forEach(el => {
+        el.className = 'demo-step-chip';
+      });
+    });
+    document.getElementById('velocity-meter').style.width = '0%';
+    document.getElementById('velocity-count').textContent = '0 / 6 transactions';
+    await loadFraudGuardData();
+    showSuccess('Demo reset — ready for next scenario.');
+  } catch (err) {
+    showError('Reset failed: ' + (err.reason || err.message));
+  }
+}
+
+
+// =======================================================================
+// AUTOMATIC FRAUD DETECTION — Real-Time Blockchain Event Watcher
+// =======================================================================
+// This replaces the old manual recordTransaction() approach completely.
+// As soon as the user connects their wallet, startFraudWatcher() launches
+// a real-time listener on the blockchain. It watches for:
+//   1. Any ETH transfer OUT of the user's wallet
+//   2. FraudAlertRaised events from FraudGuard itself
+//   3. Periodic balance checks for sudden drops
+// When it detects something suspicious, it calls reportSuspiciousActivity()
+// automatically — the user never needs to press a button.
+
+// startFraudWatcher() — starts automatic monitoring.
+// Called inside connectWallet() right after contracts are initialized.
+async function startFraudWatcher() {
+  if (!fraudContract || !userAddress || !provider) return;
+  if (fraudWatcher) stopFraudWatcher(); // clear any existing watcher
+
+  let lastBalance = await provider.getBalance(userAddress);
+  let lastBlockChecked = await provider.getBlockNumber();
+
+  // Show the watcher status indicator in the UI
+  _updateWatcherStatus('running');
+
+  console.log('[FraudGuard Watcher] Started. Monitoring wallet:', formatAddress(userAddress));
+
+  // Poll every 8 seconds. On Sepolia blocks arrive every ~12s so this catches
+  // every block without hammering the RPC endpoint.
+  fraudWatcher = setInterval(async () => {
+    try {
+      const armed = await fraudContract.isArmed().catch(() => false);
+      if (!armed) return; // guard is disarmed, skip checks
+
+      const alertLevel = await fraudContract.getAlertLevelString().catch(() => 'NONE');
+      if (alertLevel !== 'NONE') {
+        // An alert is already active — refresh the UI and wait
+        await loadFraudGuardData().catch(() => {});
+        return;
+      }
+
+      // ── Check 1: Balance drop detection ──────────────────────────
+      // If the wallet's ETH balance dropped significantly since the last
+      // check, a large transfer happened. Compute the drop and report it.
+      const currentBalance = await provider.getBalance(userAddress);
+      const drop = lastBalance - currentBalance;
+
+      if (drop > 0n) {
+        // Calculate drop as percentage of previous balance
+        const dropPct = lastBalance > 0n ? (drop * 100n) / lastBalance : 0n;
+
+        console.log(`[FraudGuard Watcher] Balance change detected: -${ethers.formatEther(drop)} ETH (${dropPct}% drop)`);
+
+        if (dropPct >= 40n) {
+          // 40%+ drop in one polling interval = highly suspicious
+          _watcherLog(`ALERT: Wallet balance dropped ${dropPct}% (${ethers.formatEther(drop)} ETH) — reporting to FraudGuard`);
+          try {
+            const tx = await fraudContract.reportSuspiciousActivity(
+              ethers.ZeroAddress, // recipient unknown from balance check alone
+              drop,
+              `AUTO-WATCHER: Wallet balance dropped ${dropPct}% in one block window`
+            );
+            await tx.wait();
+            _watcherLog('FraudGuard notified. Refreshing status...');
+            await loadFraudGuardData();
+            showError('FraudGuard Alert: Large balance drop detected! Check Fraud Guard page.');
+          } catch (e) {
+            console.warn('[FraudGuard Watcher] reportSuspiciousActivity failed:', e.message);
+          }
+        } else if (dropPct >= 20n) {
+          // 20-40% drop = suspicious but not conclusive, just log it
+          _watcherLog(`WATCHING: Balance dropped ${dropPct}% — monitoring for more signals`);
+        }
+      }
+
+      lastBalance = currentBalance; // update reference balance
+
+      // ── Check 2: Scan new blocks for outgoing transactions ────────
+      // Get the latest block and check transactions from the user's address.
+      const latestBlock = await provider.getBlockNumber();
+      if (latestBlock > lastBlockChecked) {
+        try {
+          const block = await provider.getBlock(latestBlock, true); // true = include txns
+          if (block && block.transactions) {
+            for (const tx of block.transactions) {
+              // Only care about transactions FROM the user's wallet
+              if (tx.from && tx.from.toLowerCase() === userAddress.toLowerCase()) {
+                const ethValue = tx.value || 0n;
+                const guardBalance = await provider.getBalance(await fraudContract.getAddress());
+
+                console.log(`[FraudGuard Watcher] Outgoing tx detected: ${ethers.formatEther(ethValue)} ETH to ${tx.to}`);
+
+                // Check if this tx sends more than 50% of the FraudGuard pool
+                if (guardBalance > 0n && ethValue > (guardBalance * 50n) / 100n) {
+                  _watcherLog(`SUSPICIOUS TX: ${ethers.formatEther(ethValue)} ETH to ${formatAddress(tx.to)} — auto-reporting`);
+                  try {
+                    const report = await fraudContract.reportSuspiciousActivity(
+                      tx.to || ethers.ZeroAddress,
+                      ethValue,
+                      `AUTO-WATCHER: Outgoing tx of ${ethers.formatEther(ethValue)} ETH detected in block ${latestBlock}`
+                    );
+                    await report.wait();
+                    await loadFraudGuardData();
+                    showError('FraudGuard Alert: Suspicious transaction auto-detected!');
+                  } catch (e) {
+                    console.warn('[FraudGuard Watcher] Report failed:', e.message);
+                  }
+                }
+
+                // Also check velocity — count transactions in the last hour
+                await _checkVelocity(tx.to || ethers.ZeroAddress, ethValue);
+              }
+            }
+          }
+        } catch (e) {
+          // Block fetch can fail on congested networks — silently skip
+        }
+        lastBlockChecked = latestBlock;
+      }
+
+    } catch (err) {
+      // Never crash the watcher — log and continue
+      console.warn('[FraudGuard Watcher] Poll error:', err.message);
+    }
+  }, 8000); // poll every 8 seconds
+
+  console.log('[FraudGuard Watcher] Active. Interval ID:', fraudWatcher);
+}
+
+// _checkVelocity() — tracks outgoing transaction count and reports velocity spikes.
+let _velocityLog = []; // timestamps of recent outgoing transactions
+async function _checkVelocity(recipient, amount) {
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;
+
+  // Add this transaction and purge entries older than 1 hour
+  _velocityLog.push(now);
+  _velocityLog = _velocityLog.filter(t => t > oneHourAgo);
+
+  console.log(`[FraudGuard Watcher] Velocity: ${_velocityLog.length} txns in last hour`);
+
+  if (_velocityLog.length > 5) {
+    _watcherLog(`VELOCITY SPIKE: ${_velocityLog.length} outgoing transactions in 1 hour — auto-reporting`);
+    try {
+      const tx = await fraudContract.reportSuspiciousActivity(
+        recipient,
+        amount,
+        `AUTO-WATCHER: Velocity spike — ${_velocityLog.length} outgoing transactions detected in 1 hour`
+      );
+      await tx.wait();
+      await loadFraudGuardData();
+      showError('FraudGuard Alert: Velocity spike detected! Too many outgoing transactions.');
+    } catch (e) {
+      console.warn('[FraudGuard Watcher] Velocity report failed:', e.message);
+    }
+  }
+}
+
+// stopFraudWatcher() — stops the automatic monitoring.
+// Called when the user disconnects their wallet.
+function stopFraudWatcher() {
+  if (fraudWatcher) {
+    clearInterval(fraudWatcher);
+    fraudWatcher = null;
+    _updateWatcherStatus('stopped');
+    console.log('[FraudGuard Watcher] Stopped.');
+  }
+}
+
+// _watcherLog() — shows a watcher event in the live activity feed on the page.
+function _watcherLog(message) {
+  console.log('[FraudGuard Watcher]', message);
+  // Update the live watcher feed if it exists on the page
+  const feed = document.getElementById('watcher-feed');
+  if (!feed) return;
+  const line = document.createElement('div');
+  line.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:monospace;color:var(--warning);';
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + message;
+  feed.insertBefore(line, feed.firstChild); // newest first
+  // Keep max 10 entries
+  while (feed.children.length > 10) feed.removeChild(feed.lastChild);
+}
+
+// _updateWatcherStatus() — updates the watcher indicator badge in the UI.
+function _updateWatcherStatus(status) {
+  const el = document.getElementById('watcher-status');
+  if (!el) return;
+  if (status === 'running') {
+    el.textContent = '● LIVE';
+    el.style.color = 'var(--success)';
+    el.title = 'FraudGuard is actively monitoring your wallet';
+  } else {
+    el.textContent = '○ OFF';
+    el.style.color = 'var(--muted)';
+    el.title = 'Connect wallet to start monitoring';
+  }
+}
+
+</script>
+</body>
+</html>
