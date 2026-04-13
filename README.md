@@ -15,7 +15,7 @@
 
 | | Link |
 |---|---|
-| **Live Platform** | https://lexchain-nu.vercel.app/|
+| **Live Platform** | https://lexchain-dw043ntyc-abey-aryans-projects.vercel.app/|
 | **Source Code** | https://github.com/abey-aryan/lexchain |
 
 ---
